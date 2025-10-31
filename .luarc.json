@@ -1,0 +1,6 @@
+{
+  "workspace.library": [
+    "/usr/share/love"  // adjust path if using Windows or different OS
+  ],
+  "diagnostics.globals": ["love"]
+}
