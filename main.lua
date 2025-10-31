@@ -8,6 +8,8 @@ local Background = require("src.background")
 local Layers    = require("src.layers")
 local Input     = require("src.input")
 local Assets    = require("src.assets")   -- NEW
+local Enemy    = require("src.enemy")   -- NEW
+
 
 local player, camera, viewport
 local world = {
@@ -15,6 +17,7 @@ local world = {
   height = cfg.RES_H,
   floor  = cfg.RES_H - cfg.FLOOR_OFFSET,
 }
+local enemies = {}                      -- NEW
 
 function love.load()
   love.window.setTitle("Contra-Vania (Step 6: parallax)")
@@ -35,6 +38,13 @@ function love.load()
   player     = Player.new(world)
   camera     = Camera.new()
 
+    -- Example enemies (pivot at feet; y = world.floor)
+  enemies = {
+    Enemy.new{ x = 200, y = world.floor, patrolMin = 180, patrolMax = 260, speed = 30 },
+    Enemy.new{ x = 380, y = world.floor, patrolMin = 360, patrolMax = 460, speed = 45 },
+  }
+
+
 
   dbg.log("assets", ("run_strip: %s"):format(Assets.get("player_run") and "LOADED" or "MISSING"))
 
@@ -52,6 +62,10 @@ function love.update(dt)
   if player then player:update(dt, Input) end
 
   if camera and player then camera:update(player, world, cfg.RES_W, cfg.RES_H) end
+  
+  for i = 1, #enemies do
+    enemies[i]:update(dt, world)
+  end
 
   -- clear pressed/released edges for next frame
   Input.update(dt)   -- NEW
@@ -87,6 +101,11 @@ function love.draw()
     love.graphics.line(0, world.floor, world.width, world.floor)
     -- player
     if player then player:draw() end
+    
+    -- enemies
+    for i = 1, #enemies do
+    enemies[i]:draw()
+    end
   end)
 
   -- UI layer (screen space)
