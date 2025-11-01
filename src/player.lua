@@ -134,4 +134,10 @@ function Player:draw()
   end
 end
 
+function Player:getMuzzle()
+  local mx = self.x + (self.facing >= 0 and cfg.PROJ.muzzleX or -cfg.PROJ.muzzleX)
+  local my = self.y + cfg.PROJ.muzzleY
+  return mx, my, self.facing
+end
+
 return Player

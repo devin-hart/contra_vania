@@ -75,5 +75,31 @@ C.COLLIDER = {
   }
 }
 
+-- Player projectile (single bullet)
+C.PROJ = {
+  w = 6,           -- width in pixels
+  h = 2,           -- height in pixels
+  speed = 260,     -- px/s
+  life  = 0.9,     -- seconds
+  muzzleX = 8,     -- offset from pivot X in facing direction
+  muzzleY = -18,   -- offset from pivot Y (negative = above feet)
+}
+
+C.ENEMY = {
+  spriteW = 16,
+  spriteH = 16,
+
+  COLLIDER = {
+    w = 18,
+    h = 36,   -- ← increased from 28 (or so) to 36 px tall
+    ox = 0,
+    oy = 0,
+  },
+
+  idleFrames    = 2,
+  walkFrames    = 4,
+  animIdleFPS   = 3,
+  animWalkFPS   = 8,
+}
 
 return C

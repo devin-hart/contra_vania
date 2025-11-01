@@ -27,12 +27,12 @@ function Enemy.new(opts)
 
   -- SPRITE dimensions (use config if present, else fallback)
   self.sw = (cfg.ENEMY and cfg.ENEMY.spriteW) or 16
-  self.sh = (cfg.ENEMY and cfg.ENEMY.spriteH) or 16
+  self.sh = (cfg.ENEMY and cfg.ENEMY.COLLIDER and cfg.ENEMY.COLLIDER.h) or 16
 
   -- COLLIDER (hurtbox) independent of sprite size
   local ecoll = (cfg.ENEMY and cfg.ENEMY.COLLIDER) or {}
   self.cw  = ecoll.w  or 14
-  self.ch  = ecoll.h  or 14
+  self.ch  = opts.customH or ecoll.h or 14
   self.cox = ecoll.ox or 0
   self.coy = ecoll.oy or 0
 
@@ -87,22 +87,34 @@ function Enemy:update(dt, world)
 end
 
 function Enemy:draw()
-  -- Draw sprite aligned so feet meet the pivot (anchor = sw/2, sh)
+  local flash = self.hitTimer and self.hitTimer > 0
+  if flash then
+    self.hitTimer = self.hitTimer - love.timer.getDelta()
+  end
+
+  if flash then
+    love.graphics.setColor(1, 0.2, 0.2, 1)   -- flash red on hit
+  else
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+
+  -- draw sprite (or fallback)
   local flip = (self.dir < 0)
   local ax, ay = math.floor(self.sw / 2), self.sh
   local dx = self.x - ax
   local dy = self.y - ay
   self.anim:draw(dx, dy, flip)
 
-  -- Debug collider box (shown when debug overlay visible)
+  -- collider debug
   if dbg.isVisible and dbg.isVisible() then
     local x, y, w, h = self:getCollider()
     love.graphics.setColor(1, 1, 0, 0.35)
-    love.graphics.rectangle("fill", math.floor(x), math.floor(y), w, h)
+    love.graphics.rectangle("fill", x, y, w, h)
     love.graphics.setColor(1, 1, 0, 1)
-    love.graphics.rectangle("line", math.floor(x), math.floor(y), w, h)
+    love.graphics.rectangle("line", x, y, w, h)
     love.graphics.setColor(1, 1, 1, 1)
   end
 end
+
 
 return Enemy

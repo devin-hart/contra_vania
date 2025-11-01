@@ -8,6 +8,7 @@ local bindings = {
   debug  = { "f1" },
   dump   = { "f2" },
   quit   = { "escape" },
+  shoot  = { "j", "k", "lctrl" }, -- pick preferred keys; tweak anytime
 }
 
 local down = {}       -- key -> boolean (held)

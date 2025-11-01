@@ -357,3 +357,115 @@ Idle now uses 2 frames, Run remains 6, and Jump uses 4 frames at a smaller per-f
 2. (Optional) Add F3 toggle to show/hide hurtbox independently from the debug overlay.  
 3. Begin apex/landing polish (coyote time, landing state, SFX hooks).
 
+### [2025-10-31] — Step 12: Enemy Framework
+
+**Summary**
+
+Introduced a modular enemy system with pivot-based positioning and fixed colliders.  
+Enemies can patrol between two X points, reversing direction automatically, and render within the existing layer and debug systems.  
+The framework is built to scale — future enemies can inherit and extend this class.
+
+**Changes**
+
+- Added `src/enemy.lua`
+  - Supports pivot-at-feet model identical to the player.
+  - Includes fixed hurtbox collider (`cw/ch`) independent of sprite art.
+  - Handles patrol logic with speed and direction switching.
+  - Uses animation fallback if sprites are missing.
+  - Displays debug collider boxes when the overlay (F1) is active.
+
+- Updated `main.lua`
+  - Added enemy management (`enemies` table).
+  - Spawned two sample patrolling enemies in `love.load()`.
+  - Integrated updates and rendering through the `world` layer (after player draw).
+
+**Notes**
+
+- Enemies currently move horizontally along the floor; physics is not yet applied.  
+- Sprite paths: `assets/gfx/enemy/idle_strip.png` and `assets/gfx/enemy/walk_strip.png` (optional).  
+- Default collider: 14×14 px; configurable through `cfg.ENEMY.COLLIDER`.  
+- Procedural color fallback displays if no sprite sheet is found.
+
+**Next Steps**
+
+1. Implement player–enemy collision detection (basic hit/hurt interactions).  
+2. Add projectile and damage responses.  
+3. Create distinct enemy archetypes (stationary, airborne, melee).  
+4. Add idle and attack animation strips for enemy sprites.
+
+### [2025-10-31] — Step 13: Projectile System
+
+**Summary**
+
+Implemented a modular projectile system for player firing.  
+Pressing the **Shoot** key (default: `J`, `K`, or `Left Ctrl`) spawns a fast-moving bullet that travels in the facing direction, auto-expiring after a short lifespan.  
+The system is lightweight, modular, and fully integrated with the update/draw loop and debug overlay.
+
+**Changes**
+
+- Added `src/projectile.lua`
+  - Defines a standalone `Projectile` class with position, direction, velocity, and lifetime.
+  - Handles its own update and draw logic.
+  - Uses a simple rectangle visual (6×2 px) tinted `accent` color.
+
+- Updated `config.lua`
+  - Added new `C.PROJ` block defining projectile properties:
+    - `w`, `h`, `speed`, `life`, `muzzleX`, `muzzleY`.
+
+- Updated `src/input.lua`
+  - Added a new `shoot` action binding (`j`, `k`, `lctrl`).
+
+- Updated `src/player.lua`
+  - Added `getMuzzle()` helper to calculate the bullet’s spawn offset from the player’s current pivot and facing direction.
+
+- Updated `main.lua`
+  - Added `bullets` table.
+  - Spawn bullets on `Input.wasPressed("shoot")`.
+  - Updated bullets each frame and removed expired ones.
+  - Drew bullets in the world layer before the player and enemies.
+
+**Notes**
+
+- Bullets inherit facing direction and travel horizontally at a constant velocity (`speed = 260 px/s`).  
+- Each projectile self-destructs after `life = 0.9s`.  
+- Collider size (`6×2`) defined in `C.PROJ` — ready for collision detection next step.  
+- Fully compatible with the debug overlay and live reload workflow.
+
+**Next Steps**
+
+1. Implement basic player–enemy projectile collision detection.  
+2. Add simple explosion / impact animation on hit.  
+3. Introduce firing cooldown or weapon variants (spread, laser, etc.) later.
+
+### [2025-10-31] — Step 14.1: Enemy Collider + Visual Alignment
+
+**Summary**
+
+Synced enemy visuals with their updated collider height to ensure bullets visibly connect with enemies.  
+Previously, the hitboxes were taller but the procedural sprite rectangles remained short, causing bullets to appear to fly over enemies.  
+This update brings the visual body and collider into alignment.
+
+**Changes**
+
+- **`config.lua`**
+  - Increased enemy collider height (`C.ENEMY.COLLIDER.h`) from ~28 px → 36 px for better projectile intersection.
+
+- **`src/enemy.lua`**
+  - Updated `self.sh` (sprite height) to reference the collider height:
+    ```lua
+    self.sh = (cfg.ENEMY and cfg.ENEMY.COLLIDER and cfg.ENEMY.COLLIDER.h) or 16
+    ```
+    ensuring the visual placeholder matches the actual hurtbox.
+  - (Optional) Added fallback draw logic to render a collider-sized rectangle if sprite art is missing.
+
+**Notes**
+
+- Collider and visible body now share consistent height, improving the sense of impact and hit feedback.
+- No gameplay physics or movement changed; only the visual scale and collision alignment.
+- Custom per-enemy heights can still be defined via `Enemy.new{ customH = value }`.
+
+**Next Steps**
+
+1. Add basic explosion / impact visual on bullet-enemy collision.  
+2. Replace procedural enemy rectangles with real sprite strips.  
+3. Implement enemy health and delayed death animation.

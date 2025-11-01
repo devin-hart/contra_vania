@@ -1,54 +1,56 @@
 ---@diagnostic disable: undefined-global
 local cfg        = require("config")
 local dbg        = require("cv_debug")
+local Assets     = require("src.assets")
+local Input      = require("src.input")
 local Player     = require("src.player")
+local Enemy      = require("src.enemy")
 local Camera     = require("src.camera")
 local Viewport   = require("src.viewport")
 local Background = require("src.background")
-local Layers    = require("src.layers")
-local Input     = require("src.input")
-local Assets    = require("src.assets")   -- NEW
-local Enemy    = require("src.enemy")   -- NEW
-
+local Layers     = require("src.layers")
+local Projectiles= require("src.systems.projectiles")
 
 local player, camera, viewport
+local enemies = {}
+
+-- World definition
 local world = {
   width  = cfg.WORLD_WIDTH,
   height = cfg.RES_H,
   floor  = cfg.RES_H - cfg.FLOOR_OFFSET,
 }
-local enemies = {}                      -- NEW
 
 function love.load()
-  love.window.setTitle("Contra-Vania (Step 6: parallax)")
+  love.window.setTitle("Contra-Vania")
   love.graphics.setDefaultFilter("nearest", "nearest", 1)
-  love.graphics.setLineStyle("rough")  -- avoid smoothing on lines
+  love.graphics.setLineStyle("rough")
   love.window.setMode(
     cfg.RES_W * cfg.SCALE_START, cfg.RES_H * cfg.SCALE_START,
     { resizable = true, minwidth = cfg.RES_W, minheight = cfg.RES_H }
   )
 
+  -- Preload optional sprites (safe if missing)
   Assets.loadAll({
     player_idle = cfg.SPRITES.player.idlePath,
     player_run  = cfg.SPRITES.player.runPath,
     player_jump = cfg.SPRITES.player.jumpPath,
+    enemy_idle  = "assets/gfx/enemy/idle_strip.png",
+    enemy_walk  = "assets/gfx/enemy/walk_strip.png",
   })
 
-  viewport   = Viewport.new(cfg.RES_W, cfg.RES_H, cfg.SCALE_START)
-  player     = Player.new(world)
-  camera     = Camera.new()
+  viewport = Viewport.new(cfg.RES_W, cfg.RES_H, cfg.SCALE_START)
+  player   = Player.new(world)
+  camera   = Camera.new()
+  Projectiles.init()
 
-    -- Example enemies (pivot at feet; y = world.floor)
+  -- Sample enemies (patrol on floor)
   enemies = {
     Enemy.new{ x = 200, y = world.floor, patrolMin = 180, patrolMax = 260, speed = 30 },
     Enemy.new{ x = 380, y = world.floor, patrolMin = 360, patrolMax = 460, speed = 45 },
   }
 
-
-
-  dbg.log("assets", ("run_strip: %s"):format(Assets.get("player_run") and "LOADED" or "MISSING"))
-
-  dbg.log("boot", "initialized viewport, background, player, camera, debug")
+  dbg.log("boot", "initialized viewport, assets, player, enemies, camera")
 end
 
 function love.resize()
@@ -58,61 +60,79 @@ end
 function love.update(dt)
   dbg.update(dt)
 
-  -- player uses input state
+  -- Player + camera
   if player then player:update(dt, Input) end
-
   if camera and player then camera:update(player, world, cfg.RES_W, cfg.RES_H) end
-  
+
+  -- Fire on press
+  if Input.wasPressed("shoot") and player then
+    local mx, my, dir = player:getMuzzle()
+    Projectiles.spawn(mx, my, dir)
+  end
+
+  -- Update systems
+  Projectiles.update(dt)
+
+  -- Bullet → enemy hits
+  Projectiles.hitEnemies(enemies)
+
+  -- Enemy AI/update + cleanup
   for i = 1, #enemies do
     enemies[i]:update(dt, world)
   end
+  local e = 1
+  while e <= #enemies do
+    if enemies[e].dead then
+      table.remove(enemies, e)
+    else
+      e = e + 1
+    end
+  end
 
-  -- clear pressed/released edges for next frame
-  Input.update(dt)   -- NEW
+  -- End-of-frame input housekeeping
+  Input.update(dt)
 end
 
-
 function love.keypressed(key)
-  Input.keypressed(key)              -- NEW
+  Input.keypressed(key)
   if Input.wasPressed("debug") then dbg.toggle() end
   if Input.wasPressed("dump")  then dbg.dump()   end
   if Input.wasPressed("quit")  then love.event.quit() end
 end
 
 function love.keyreleased(key)
-  Input.keyreleased(key)             -- NEW
+  Input.keyreleased(key)
 end
-
 
 function love.draw()
   viewport:begin()
 
   Layers.begin()
 
-  -- Background layer (no camera)
+  -- Background (no camera)
   Layers.add("background", function()
     Background.draw(camera and camera.x or 0, cfg.RES_W, cfg.RES_H)
   end)
 
-  -- World layer (camera applied automatically by Layers.draw)
+  -- World (camera applied)
   Layers.add("world", function()
-    -- floor
     love.graphics.setColor(cfg.COLORS.floor)
     love.graphics.line(0, world.floor, world.width, world.floor)
-    -- player
+
+    Projectiles.draw()
+
     if player then player:draw() end
-    
-    -- enemies
     for i = 1, #enemies do
-    enemies[i]:draw()
+      enemies[i]:draw()
     end
   end)
 
-  -- UI layer (screen space)
+  -- UI (screen space)
   Layers.add("ui", function()
     love.graphics.setColor(cfg.COLORS.accent)
     love.graphics.rectangle("line", 8, 8, cfg.RES_W - 16, cfg.RES_H - 16)
     love.graphics.setColor(cfg.COLORS.white)
+    love.graphics.print("Contra-Vania — Step 14 (proj + hits)", 10, 10)
   end)
 
   Layers.draw({ camera = camera })
@@ -120,4 +140,3 @@ function love.draw()
   viewport:finish()
   dbg.draw()
 end
-
