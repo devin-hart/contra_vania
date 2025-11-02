@@ -684,3 +684,47 @@ This marks the transition from a static floor to data-driven levels.
 1. Add terrain collisions for player feet and bullets (use `isSolidAt` checks).  
 2. Create a simple tile-based renderer for visual variety (grass, rock, etc.).  
 3. Add a lightweight map editor or loader for multiple levels.
+
+### [2025-10-31] — Step 19: Tilemap Collision + Visible Solids (WIP)
+
+**Summary:**
+Expanded the tilemap system to draw visible platforms and improved player vertical collision logic.  
+Player now correctly lands, jumps, and walks on solid tiles rather than the legacy flat floor.  
+Solids are visually represented for debugging and alignment checks.
+
+**Changes**
+- Added solid-tile rendering to `tilemap.lua` (`Tilemap:draw`) so platforms are visible.
+- Updated `player.lua` vertical collision logic:
+  - Player feet now snap precisely to the top of solids using collider bottom.
+  - Added a fallback to legacy flat floor when no tilemap collision is detected.
+  - Fixed `onGround` logic for consistent animation state.
+- Confirmed that player physics and animations behave correctly across raised platforms.
+
+**Notes**
+- Player now collides with both legacy floor and map tiles.
+- Left edge remains flat-ground fallback.
+- Green platforms represent `solids` defined in `assets/levels/level1.lua`.
+- Next step will hide debug platforms and replace them with graphical tiles or tileset rendering.
+
+### [2025-10-31] — Step 20: Debug Overlay (Tile Solids + Colliders)
+
+**Summary:**
+Implemented a comprehensive debug overlay for visualizing tilemap solids and entity colliders.  
+This system ties into the existing `cv_debug` overlay (toggled with F1), allowing developers to inspect physics alignment and collision regions in real time.
+
+**Changes**
+- Expanded `cv_debug.lua`:
+  - Added `drawTilemap(map)` to outline all solid tiles (red boxes).
+  - Added `drawColliders(player, enemies)` to render translucent collider boxes for all active entities.
+  - Integrated new draw helpers into existing debug toggle system.
+- Updated `main.lua`:
+  - Hooked both functions into the main world draw phase.
+  - Overlays now follow camera position (world-space accurate).
+  - Retained screen-space FPS/memory HUD as before.
+- Confirmed no interference with normal rendering pipeline or live reload.
+
+**Notes**
+- Toggle with **F1** for real-time inspection.
+- Solids outlined in **red**; player collider in **yellow**, enemies in **magenta**.
+- Works across all levels and scales correctly with camera movement.
+- Useful for aligning tile collision data and sprite hitboxes before switching to final tileset art.

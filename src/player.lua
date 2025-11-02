@@ -14,22 +14,22 @@ function Player.new(world)
   self.sh = cfg.SPRITES.player.frameH
 
   -- COLLIDER (gameplay) size, independent of sprite
-  self.cw = (cfg.COLLIDER and cfg.COLLIDER.player.w) or self.sw
-  self.ch = (cfg.COLLIDER and cfg.COLLIDER.player.h) or self.sh
+  self.cw  = (cfg.COLLIDER and cfg.COLLIDER.player.w)  or self.sw
+  self.ch  = (cfg.COLLIDER and cfg.COLLIDER.player.h)  or self.sh
   self.cox = (cfg.COLLIDER and cfg.COLLIDER.player.ox) or 0
   self.coy = (cfg.COLLIDER and cfg.COLLIDER.player.oy) or 0
 
   -- PIVOT: feet-center in world space
-  self.x = 32                   -- pivot X (feet center)
-  self.y = world.floor          -- pivot Y (on the floor)
+  self.x = 32
+  self.y = world.floor
 
   self.vx, self.vy = 0, 0
   self.speed   = cfg.PLAYER_SPEED
   self.jumpV   = cfg.PLAYER_JUMPV
   self.gravity = cfg.GRAVITY
   self.onGround = true
-  self.facing = 1
-  self.world = world
+  self.facing   = 1
+  self.world    = world
 
   -- Try to fetch images (may be nil -> procedural fallback)
   local idleImg = Assets.get("player_idle")
@@ -70,14 +70,14 @@ local function chooseAnim(self)
   end
 end
 
--- Helpers: collider rectangle from pivot
+-- Helper to get collider rect from pivot
 local function colliderRect(self)
   local x = self.x - math.floor(self.cw / 2) + self.cox
   local y = self.y - self.ch + self.coy
   return x, y, self.cw, self.ch
 end
 
-function Player:update(dt, input)
+function Player:update(dt, input, map)
   -- horizontal input
   local left  = input and input.isDown and input.isDown("left")
   local right = input and input.isDown and input.isDown("right")
@@ -95,10 +95,45 @@ function Player:update(dt, input)
   -- integrate motion (pivot-based)
   self.x = self.x + self.vx * dt
   self.vy = self.vy + self.gravity * dt
-  self.y = self.y + self.vy * dt
+  self.y  = self.y + self.vy * dt
 
-  -- floor collision (pivot is feet)
-  if self.y >= self.world.floor then
+  -- vertical resolve: prefer map tiles; fall back to legacy flat floor if no solids
+  local landedViaMap = false
+  if map then
+    local x, y, w, h = colliderRect(self)
+    local ts = map.ts
+
+    if self.vy > 0 then
+      -- falling: if overlapping a solid, snap feet to tile top
+      if map:aabbOverlapsSolid(x, y, w, h) then
+        local bottom     = y + h
+        local topOfSolid = math.floor(bottom / ts) * ts
+        self.y  = topOfSolid
+        self.vy = 0
+        self.onGround = true
+        landedViaMap = true
+      else
+        self.onGround = false
+      end
+
+    elseif self.vy < 0 then
+      -- jumping upward: bonk head and push just below solid
+      if map:aabbOverlapsSolid(x, y, w, h) then
+        local headTop        = y
+        local bottomOfSolid  = (math.floor(headTop / ts) + 1) * ts
+        self.y  = bottomOfSolid + self.ch
+        self.vy = 0
+      end
+
+    else
+      -- idle vertical: probe 1px below feet to maintain grounded flag
+      local px, py = x, y + 1
+      self.onGround = map:aabbOverlapsSolid(px, py, w, h)
+    end
+  end
+
+  -- legacy flat-floor fallback (keeps left side playable when no solids)
+  if (not landedViaMap) and self.y >= self.world.floor then
     self.y = self.world.floor
     self.vy = 0
     self.onGround = true
@@ -126,9 +161,9 @@ function Player:draw()
   -- Debug: draw collider box when overlay is visible
   if dbg.isVisible and dbg.isVisible() then
     local x, y, w, h = colliderRect(self)
-    love.graphics.setColor(1, 1, 0, 0.35)   -- translucent fill
+    love.graphics.setColor(1, 1, 0, 0.35)
     love.graphics.rectangle("fill", math.floor(x), math.floor(y), w, h)
-    love.graphics.setColor(1, 1, 0, 1)      -- outline
+    love.graphics.setColor(1, 1, 0, 1)
     love.graphics.rectangle("line", math.floor(x), math.floor(y), w, h)
     love.graphics.setColor(1, 1, 1, 1)
   end

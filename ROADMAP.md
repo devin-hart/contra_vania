@@ -47,71 +47,94 @@
 10. **Sprite Integration**
     - Load sprite sheets from `assets/gfx/player/`.  
     - Replace procedural animations with real frames.  
+    - Verify frame alignment with collider visualization.
 
 11. **Jump + Land Polish**
     - Add apex detection, landing states, and coyote time.  
-    - Integrate jump and landing sound effects.
+    - Integrate jump and landing sound effects for tactile feedback.  
+    - Smooth out transitions between air and ground animations.
 
 12. **Enemy Framework**
     - Create base `enemy.lua` class and simple patrol AI.  
-    - Introduce collision logic with player projectiles.
+    - Introduce collision logic with player projectiles.  
+    - Add idle/run state machine for enemies.
 
 13. **Projectile System**
     - Implement player shooting and basic bullet entities.  
-    - Add cooldowns, hit detection, and effects.
+    - Add cooldowns, hit detection, and effects.  
+    - Spawn bullets relative to player muzzle offset.
 
-14. **Player Health + Damage System**
-    - Add player health and death conditions.  
-    - Introduce visual feedback for damage.
+14. **Collision + Hit Detection**
+    - Centralize all collisions in `collisions.lua`.  
+    - Support entity, projectile, and tilemap hit responses.  
+    - Introduce small knockback effect for enemy hits.
 
-15. **Enemy AI + Attack Patterns**
-    - Expand enemy behavior logic and animation states.  
-    - Add attack projectiles and melee variants.
+15. **Enemy AI + Damage Feedback**
+    - Add visual hit feedback for enemies on damage (red flash).  
+    - Preserve direction markers for debugging and orientation.  
+    - Implement simple death/despawn behavior.
 
-16. **Collision + Hit Detection**
-    - Build a collision manager for entities, projectiles, and tiles.  
-    - Support basic hitboxes and response callbacks.
+16. **Tilemap + Terrain Collision**
+    - Add basic tilemap system (`tilemap.lua`) with solid detection.  
+    - Integrate vertical collision logic with fallback to flat floor.  
+    - Player can now land and move across tile-based surfaces.
 
-17. **Collectibles + Powerups**
-    - Implement pickups for health, ammo, and temporary boosts.  
-    - Add particle feedback for item collection.
+17. **Collectibles + Item System**
+    - Create `items.lua` for pickups (gems, health, etc.).  
+    - Add item collection feedback and particle placeholder.  
+    - Tie collection into debug log for tracking.
 
-18. **Level Loader (Tilemap System)**
-    - Load stages from Lua/JSON tilemaps.  
-    - Separate foreground and background layers.
+18. **Tilemap Expansion (Platforms + Scrolling Map)**
+    - Add platforms and raised terrain to `level1.lua`.  
+    - Enable scrolling map support in camera.  
+    - Player can traverse elevated terrain and mid-air platforms.
 
-19. **Environment Layers Expansion**
-    - Add extra parallax depth and animated environment details.  
-    - Include scrolling clouds, torches, and ambient motion.
+19. **WIP: Environment Layers + Tile Rendering**
+    - Visible green solids represent collision platforms.  
+    - Player and enemies fully interact with map surfaces.  
+    - Will later include tileset-based visual rendering and art polish.
 
-20. **Boss Logic Framework**
-    - Create reusable structure for multi-phase bosses.  
-    - Add basic boss intro and health bar UI.
+20. **Debug Overlay Expansion**
+    - Added `cv_debug.drawTilemap()` and `cv_debug.drawColliders()`.  
+    - Visualize solid tiles and entity colliders with F1 toggle.  
+    - Essential for collision alignment and debugging.
 
-21. **UI + HUD Elements**
-    - Display health, score, and weapon info.  
-    - Add animated icons and energy bars.
+21. **Tileset Graphics + Environment Rendering**
+    - Replace placeholder solids with real tileset art.  
+    - Add multiple background parallax layers for depth.  
+    - Prepare environment for thematic visual polish.
 
-22. **Pause + Options Menu**
-    - Implement pause screen and settings (audio, controls).  
-    - Add return-to-title flow.
+22. **HUD + UI Elements**
+    - Implement player health, score, and ammo display.  
+    - Add pause overlay and basic font assets.  
+    - Hook into gameplay data for live updates.
 
-23. **Sound + Music Integration**
-    - Load and manage background tracks and SFX.  
-    - Implement volume controls and playback management.
+23. **Pause + Options Menu**
+    - Create pause menu with resume/quit options.  
+    - Include toggles for music, sound, and debug mode.  
+    - Add scene management for state transitions.
 
-24. **Save System + Checkpoints**
-    - Add checkpoint respawn logic and save slots.  
-    - Store player progress and inventory.
+24. **Sound + Music Integration**
+    - Integrate retro-inspired SFX for player, enemies, and items.  
+    - Add background music system with looping and transitions.  
+    - Volume controls tied into options menu.
 
-25. **Title Screen + Scene Flow**
-    - Implement title menu, transitions, and scene switching.  
-    - Add simple “New Game” and “Continue” options.
+25. **Save System + Checkpoints**
+    - Add save points and checkpoint respawn logic.  
+    - Persist progress (level, score, collectibles).  
+    - Write basic serialization for save data.
 
-26. **Final Balancing + Polish**
-    - Fine-tune movement, physics, and pacing.  
-    - Clean up visuals, audio, and transitions.
+26. **Boss Framework + Encounter Logic**
+    - Create dedicated `boss.lua` class with intro/attack patterns.  
+    - Add health bar, hit phases, and damage thresholds.  
+    - Integrate event-based transition on boss defeat.
 
-27. **Packaging + Distribution**
-    - Prepare release build for Windows/Linux/macOS.  
-    - Add icons, metadata, and optional web export.
+27. **Title Screen + Scene Flow**
+    - Implement title menu and scene transitions.  
+    - Add logo animation, start prompt, and fade effects.  
+    - Include level select and credits placeholder.
+
+28. **Final Polish + Packaging**
+    - Optimize assets, clean up code, and finalize build structure.  
+    - Add splash screen and final audio mastering.  
+    - Package for release with README + credits.

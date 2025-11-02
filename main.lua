@@ -11,7 +11,7 @@ local Layers     = require("src.layers")
 local Projectiles= require("src.systems.projectiles")
 local Collisions = require("src.systems.collisions")
 local Items      = require("src.systems.items")
-local Tilemap    = require("src.tilemap")   -- NEW
+local Tilemap    = require("src.tilemap")
 
 local player, camera, viewport, map
 local enemies = {}
@@ -41,11 +41,11 @@ function love.load()
     enemy_walk  = "assets/gfx/enemy/walk_strip.png",
   })
 
-  -- Load level (NEW)
+  -- Load level
   map = Tilemap.load("assets.levels.level1")
   world.width  = map.worldWidth
   world.height = map.worldHeight
-  world.floor  = cfg.RES_H - cfg.FLOOR_OFFSET   -- keep legacy floor for now
+  world.floor  = cfg.RES_H - cfg.FLOOR_OFFSET   -- legacy floor still active
 
   viewport = Viewport.new(cfg.RES_W, cfg.RES_H, cfg.SCALE_START)
   player   = Player.new(world)
@@ -74,7 +74,7 @@ function love.update(dt)
   dbg.update(dt)
 
   -- Player + camera
-  if player then player:update(dt, Input) end
+  if player then player:update(dt, Input, map) end
   if camera and player then camera:update(player, world, cfg.RES_W, cfg.RES_H) end
 
   -- Fire
@@ -84,7 +84,7 @@ function love.update(dt)
   end
 
   -- Update systems
-  Projectiles.update(dt)
+  Projectiles.update(dt, map)
   Items.update(dt)
   Collisions.update(dt, world, player, enemies, Projectiles, Items)
 
@@ -107,8 +107,8 @@ end
 
 function love.keypressed(key)
   Input.keypressed(key)
-  if Input.wasPressed("debug") then dbg.toggle() end
-  if Input.wasPressed("dump")  then dbg.dump()   end
+  if Input.wasPressed("debug") then dbg.toggle() end   -- F1
+  if Input.wasPressed("dump")  then dbg.dump()   end   -- F2
   if Input.wasPressed("quit")  then love.event.quit() end
 end
 
@@ -130,15 +130,22 @@ function love.draw()
     -- MAP (draw behind everything else)
     if map then map:draw(camera and camera.x or 0, cfg.RES_W, cfg.RES_H) end
 
-    -- Floor line (temporary legacy)
-    love.graphics.setColor(cfg.COLORS.floor)
-    love.graphics.line(0, world.floor, world.width, world.floor)
-
     -- Entities
     Projectiles.draw()
     Items.draw()
     if player then player:draw() end
     for i = 1, #enemies do enemies[i]:draw() end
+
+    -- Debug: world-space overlays (solids + colliders)
+    if dbg.isVisible() then
+      dbg.drawTilemap(map)
+      dbg.drawColliders(player, enemies)
+    end
+
+    -- (optional) floor line for legacy reference
+    love.graphics.setColor(cfg.COLORS.floor)
+    love.graphics.line(0, world.floor, world.width, world.floor)
+    love.graphics.setColor(1,1,1,1)
   end)
 
   -- UI
@@ -146,10 +153,12 @@ function love.draw()
     love.graphics.setColor(cfg.COLORS.accent)
     love.graphics.rectangle("line", 8, 8, cfg.RES_W - 16, cfg.RES_H - 16)
     love.graphics.setColor(cfg.COLORS.white)
-    love.graphics.print("Contra-Vania — Step 18 (tilemap load)", 10, 10)
+    love.graphics.print("Contra-Vania — Step 20 (debug overlays)", 10, 10)
   end)
 
   Layers.draw({ camera = camera })
   viewport:finish()
+
+  -- Screen-space debug HUD
   dbg.draw()
 end

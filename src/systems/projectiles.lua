@@ -14,14 +14,25 @@ function P.spawn(mx, my, dir)
   bullets[#bullets+1] = Projectile.new{ x = mx, y = my, dir = dir }
 end
 
-function P.update(dt)
+function P.update(dt, map)
   if #bullets == 0 then return end
   local i = 1
   while i <= #bullets do
-    if bullets[i]:update(dt) then
-      i = i + 1
+    local b = bullets[i]
+    local alive = b:update(dt)
+
+    local hitTerrain = false
+    if map then
+      local x, y, w, h = b:getCollider()
+      if map:aabbOverlapsSolid(x, y, w, h) then
+        hitTerrain = true
+      end
+    end
+
+    if hitTerrain or not alive then
+      table.remove(bullets, i)   -- do not increment i; next item shifts into i
     else
-      table.remove(bullets, i)
+      i = i + 1
     end
   end
 end

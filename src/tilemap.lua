@@ -32,6 +32,7 @@ function Tilemap:draw(cameraX, resW, resH)
   local startX = math.max(1, math.floor(cameraX / ts) + 1)
   local endX   = math.min(self.tw, math.floor((cameraX + resW) / ts) + 1)
 
+  -- 1) Background tiles (decor)
   for y = 1, self.th do
     for x = startX, endX do
       local id = self.bg[y][x]
@@ -42,6 +43,17 @@ function Tilemap:draw(cameraX, resW, resH)
       end
     end
   end
+
+  -- 2) Solids (platforms/ground) — draw as visible blocks for now
+  love.graphics.setColor(0.40, 0.85, 0.35, 1.0)  -- platform green
+  for y = 1, self.th do
+    for x = startX, endX do
+      if self.solids[y][x] == true then
+        love.graphics.rectangle("fill", (x-1)*ts, (y-1)*ts, ts, ts)
+      end
+    end
+  end
+
   love.graphics.setColor(1,1,1,1)
 end
 
