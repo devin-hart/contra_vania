@@ -140,4 +140,10 @@ function Player:getMuzzle()
   return mx, my, self.facing
 end
 
+function Player:getCollider()
+  local x = self.x - math.floor(self.cw / 2) + self.cox
+  local y = self.y - self.ch + self.coy
+  return x, y, self.cw, self.ch
+end
+
 return Player

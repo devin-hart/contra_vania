@@ -56,6 +56,12 @@ function Enemy.new(opts)
   }
 
   self.anim = self.animWalk
+    -- Health / hit feedback
+  self.hp        = (cfg.ENEMY and cfg.ENEMY.hp) or 1
+  self.hitTimer  = 0
+  self.deathTime = 0
+  self.dead      = false
+
   return self
 end
 
@@ -66,7 +72,28 @@ function Enemy:getCollider()
   return x, y, self.cw, self.ch
 end
 
+function Enemy:takeDamage(dmg)
+  if self.dead then return end
+  self.hp = math.max(0, self.hp - (dmg or 1))
+  self.hitTimer = (cfg.ENEMY and cfg.ENEMY.hitFlash) or 0.1
+  if self.hp <= 0 then
+    self.dead = true
+    self.deathTime = (cfg.ENEMY and cfg.ENEMY.deathTime) or 0.2
+  end
+end
+
 function Enemy:update(dt, world)
+      -- death countdown
+  if self.dead then
+    self.deathTime = self.deathTime - dt
+    return
+  end
+
+  -- tick hit flash
+  if self.hitTimer and self.hitTimer > 0 then
+    self.hitTimer = self.hitTimer - dt
+    if self.hitTimer < 0 then self.hitTimer = 0 end
+  end
   -- Patrol movement
   self.x = self.x + self.dir * self.speed * dt
 
@@ -88,33 +115,47 @@ end
 
 function Enemy:draw()
   local flash = self.hitTimer and self.hitTimer > 0
-  if flash then
-    self.hitTimer = self.hitTimer - love.timer.getDelta()
+  local alpha = 1.0
+  if self.dead then
+    alpha = math.max(0, self.deathTime / ((cfg.ENEMY and cfg.ENEMY.deathTime) or 0.2))
   end
 
-  if flash then
-    love.graphics.setColor(1, 0.2, 0.2, 1)   -- flash red on hit
-  else
-    love.graphics.setColor(1, 1, 1, 1)
-  end
-
-  -- draw sprite (or fallback)
   local flip = (self.dir < 0)
   local ax, ay = math.floor(self.sw / 2), self.sh
   local dx = self.x - ax
   local dy = self.y - ay
-  self.anim:draw(dx, dy, flip)
 
-  -- collider debug
+  if self.anim and self.anim.image then
+    -- Sprite sheet exists: tint the image
+    if flash then love.graphics.setColor(1, 0.25, 0.25, alpha) else love.graphics.setColor(1, 1, 1, alpha) end
+    self.anim:draw(dx, dy, flip)
+  else
+    -- Procedural fallback: draw our own rectangle so flash color isn't overridden
+    local r,g,b = (flash and 1 or 0.4), (flash and 0.25 or 0.9), (flash and 0.25 or 0.4)
+    love.graphics.setColor(r, g, b, alpha)
+    local x, y, w, h = self:getCollider()
+    love.graphics.rectangle("fill", math.floor(x), math.floor(y), w, h)
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+
+    -- Facing direction indicator (small line above head)
+  local lineLen = 6
+  local lx1 = self.x
+  local ly1 = self.y - self.sh - 2
+  local lx2 = lx1 + (self.dir * lineLen)
+  love.graphics.setColor(0.8, 0.8, 0.2, 1)
+  love.graphics.line(lx1, ly1, lx2, ly1)
+  love.graphics.setColor(1, 1, 1, 1)
+
+  -- Debug collider overlay
   if dbg.isVisible and dbg.isVisible() then
     local x, y, w, h = self:getCollider()
-    love.graphics.setColor(1, 1, 0, 0.35)
-    love.graphics.rectangle("fill", x, y, w, h)
-    love.graphics.setColor(1, 1, 0, 1)
-    love.graphics.rectangle("line", x, y, w, h)
+    love.graphics.setColor(1, 1, 0, 0.35); love.graphics.rectangle("fill", x, y, w, h)
+    love.graphics.setColor(1, 1, 0, 1);    love.graphics.rectangle("line", x, y, w, h)
     love.graphics.setColor(1, 1, 1, 1)
   end
 end
+
 
 
 return Enemy

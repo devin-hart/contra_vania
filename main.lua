@@ -1,4 +1,3 @@
----@diagnostic disable: undefined-global
 local cfg        = require("config")
 local dbg        = require("cv_debug")
 local Assets     = require("src.assets")
@@ -10,8 +9,11 @@ local Viewport   = require("src.viewport")
 local Background = require("src.background")
 local Layers     = require("src.layers")
 local Projectiles= require("src.systems.projectiles")
+local Collisions = require("src.systems.collisions")
+local Items      = require("src.systems.items")
+local Tilemap    = require("src.tilemap")   -- NEW
 
-local player, camera, viewport
+local player, camera, viewport, map
 local enemies = {}
 
 -- World definition
@@ -39,18 +41,29 @@ function love.load()
     enemy_walk  = "assets/gfx/enemy/walk_strip.png",
   })
 
+  -- Load level (NEW)
+  map = Tilemap.load("assets.levels.level1")
+  world.width  = map.worldWidth
+  world.height = map.worldHeight
+  world.floor  = cfg.RES_H - cfg.FLOOR_OFFSET   -- keep legacy floor for now
+
   viewport = Viewport.new(cfg.RES_W, cfg.RES_H, cfg.SCALE_START)
   player   = Player.new(world)
   camera   = Camera.new()
   Projectiles.init()
+  Items.init()
 
-  -- Sample enemies (patrol on floor)
+  -- sample items
+  Items.spawn(260, world.floor - 10, "gem")
+  Items.spawn(440, world.floor - 10, "gem")
+
+  -- sample enemies
   enemies = {
     Enemy.new{ x = 200, y = world.floor, patrolMin = 180, patrolMax = 260, speed = 30 },
     Enemy.new{ x = 380, y = world.floor, patrolMin = 360, patrolMax = 460, speed = 45 },
   }
 
-  dbg.log("boot", "initialized viewport, assets, player, enemies, camera")
+  dbg.log("boot", "initialized viewport, assets, map, player, enemies, camera")
 end
 
 function love.resize()
@@ -64,7 +77,7 @@ function love.update(dt)
   if player then player:update(dt, Input) end
   if camera and player then camera:update(player, world, cfg.RES_W, cfg.RES_H) end
 
-  -- Fire on press
+  -- Fire
   if Input.wasPressed("shoot") and player then
     local mx, my, dir = player:getMuzzle()
     Projectiles.spawn(mx, my, dir)
@@ -72,24 +85,23 @@ function love.update(dt)
 
   -- Update systems
   Projectiles.update(dt)
+  Items.update(dt)
+  Collisions.update(dt, world, player, enemies, Projectiles, Items)
 
-  -- Bullet → enemy hits
-  Projectiles.hitEnemies(enemies)
-
-  -- Enemy AI/update + cleanup
+  -- Enemy logic + cleanup
   for i = 1, #enemies do
     enemies[i]:update(dt, world)
   end
   local e = 1
   while e <= #enemies do
-    if enemies[e].dead then
+    local en = enemies[e]
+    if en.dead and (en.deathTime or 0) <= 0 then
       table.remove(enemies, e)
     else
       e = e + 1
     end
   end
 
-  -- End-of-frame input housekeeping
   Input.update(dt)
 end
 
@@ -106,37 +118,38 @@ end
 
 function love.draw()
   viewport:begin()
-
   Layers.begin()
 
-  -- Background (no camera)
+  -- Background (static)
   Layers.add("background", function()
     Background.draw(camera and camera.x or 0, cfg.RES_W, cfg.RES_H)
   end)
 
-  -- World (camera applied)
+  -- World (camera)
   Layers.add("world", function()
+    -- MAP (draw behind everything else)
+    if map then map:draw(camera and camera.x or 0, cfg.RES_W, cfg.RES_H) end
+
+    -- Floor line (temporary legacy)
     love.graphics.setColor(cfg.COLORS.floor)
     love.graphics.line(0, world.floor, world.width, world.floor)
 
+    -- Entities
     Projectiles.draw()
-
+    Items.draw()
     if player then player:draw() end
-    for i = 1, #enemies do
-      enemies[i]:draw()
-    end
+    for i = 1, #enemies do enemies[i]:draw() end
   end)
 
-  -- UI (screen space)
+  -- UI
   Layers.add("ui", function()
     love.graphics.setColor(cfg.COLORS.accent)
     love.graphics.rectangle("line", 8, 8, cfg.RES_W - 16, cfg.RES_H - 16)
     love.graphics.setColor(cfg.COLORS.white)
-    love.graphics.print("Contra-Vania — Step 14 (proj + hits)", 10, 10)
+    love.graphics.print("Contra-Vania — Step 18 (tilemap load)", 10, 10)
   end)
 
   Layers.draw({ camera = camera })
-
   viewport:finish()
   dbg.draw()
 end

@@ -102,4 +102,22 @@ C.ENEMY = {
   animWalkFPS   = 8,
 }
 
+-- Bullet damage
+C.PROJ.dmg = 1
+
+-- Enemy defaults
+C.ENEMY = C.ENEMY or {}
+C.ENEMY.hp          = 2      -- hits to kill
+C.ENEMY.hitFlash    = 0.12   -- seconds of red flash
+C.ENEMY.deathTime   = 0.25   -- seconds before removal once hp <= 0
+
+-- Collectible defaults
+C.ITEM = {
+  w = 8,        -- collider width
+  h = 8,        -- collider height
+  bob = 6,      -- bobbing amplitude (px)
+  bobSpeed = 3, -- bobbing speed (Hz-ish)
+}
+
+
 return C

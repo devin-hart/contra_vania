@@ -469,3 +469,218 @@ This update brings the visual body and collider into alignment.
 1. Add basic explosion / impact visual on bullet-enemy collision.  
 2. Replace procedural enemy rectangles with real sprite strips.  
 3. Implement enemy health and delayed death animation.
+
+### [2025-10-31] — Step 15: Enemy Health, Death Handling & Facing Indicator
+
+**Summary**
+
+Expanded the enemy framework to support health, damage handling, hit flash, death fade, and restored the facing-direction indicator.  
+Enemies now take multiple hits to kill, flash red when damaged, fade out upon death, and remove themselves after a short delay.  
+Also re-added the small directional line that shows which way an enemy is facing.
+
+**Changes**
+
+- **`config.lua`**
+  - Added new tunables:
+    ```lua
+    C.PROJ.dmg = 1
+    C.ENEMY.hp        = 2
+    C.ENEMY.hitFlash  = 0.12
+    C.ENEMY.deathTime = 0.25
+    ```
+  - These define bullet damage, enemy health, flash duration, and fade-out time.
+
+- **`src/enemy.lua`**
+  - Added new fields: `hp`, `hitTimer`, `deathTime`, and `dead`.
+  - Implemented `Enemy:takeDamage(dmg)` to handle incoming projectile hits.
+  - Updated `Enemy:update(dt)`:
+    - Processes hit flash and death countdown timers.
+    - Skips movement once an enemy has died.
+  - Updated `Enemy:draw()`:
+    - Applies red flash color while `hitTimer` is active.
+    - Fades sprite opacity as `deathTime` counts down.
+    - Draws procedural fallback rectangle if no sprite is loaded.
+    - Restored **facing-direction indicator**:
+      ```lua
+      local lineLen = 6
+      local lx1 = self.x
+      local ly1 = self.y - self.sh - 2
+      local lx2 = lx1 + (self.dir * lineLen)
+      love.graphics.setColor(0.8, 0.8, 0.2, 1)
+      love.graphics.line(lx1, ly1, lx2, ly1)
+      love.graphics.setColor(1, 1, 1, 1)
+      ```
+
+- **`src/systems/projectiles.lua`**
+  - Changed collision behavior to call `enemies[e]:takeDamage(cfg.PROJ.dmg)` instead of killing instantly.
+
+- **`main.lua`**
+  - Adjusted cleanup logic:
+    ```lua
+    if en.dead and (en.deathTime or 0) <= 0 then
+        table.remove(enemies, e)
+    end
+    ```
+    ensuring enemies persist briefly for death fade.
+
+**Notes**
+
+- Each enemy starts with 2 HP and takes 1 damage per bullet.  
+- Hit flash is visible for 0.12 s, then fades smoothly over 0.25 s before removal.  
+- Works with both sprite and fallback rendering.  
+- The facing line provides continuous orientation feedback, independent of the debug overlay.  
+
+**Next Steps**
+
+1. Add a simple explosion / impact animation on bullet hits.  
+2. Introduce basic enemy attack behavior (projectile or melee).  
+3. Begin centralizing death / impact effects into a reusable visual system.
+
+### [2025-10-31] — Step 16: Centralized Collision System
+
+**Summary**
+
+Moved all hit detection into a dedicated collision manager, reducing clutter in `main.lua` and improving modularity.  
+The system now handles all collision logic through a single module, preparing the groundwork for future interactions (e.g., player ↔ enemy or pickups).  
+Also fixed an aliasing issue in the projectile system that prevented bullets from registering hits.
+
+**Changes**
+
+- **Added `src/systems/collisions.lua`**
+  - Centralizes all game collision logic.
+  - Handles projectile → enemy detection using shared AABB checks (`Collision.rectsOverlap`).
+  - Calls `enemy:takeDamage(cfg.PROJ.dmg)` for each confirmed hit.
+
+- **Updated `src/systems/projectiles.lua`**
+  - Exposed `P.list` (the active bullet table) for external systems.
+  - Fixed aliasing bug:
+    ```lua
+    function P.init()
+      bullets = {}
+      P.list = bullets  -- reassign pointer to keep synced
+    end
+    ```
+    This ensures that when bullets are reinitialized, the collision system sees the live table instead of a stale reference.
+
+- **Added `local Collisions = require("src.systems.collisions")` to `main.lua`**
+  - Replaced inline collision code with:
+    ```lua
+    Collisions.update(dt, world, player, enemies, Projectiles)
+    ```
+  - Keeps `love.update()` focused solely on high-level flow (input, updates, rendering).
+
+**Notes**
+
+- Collisions now operate entirely through `src/systems/collisions.lua`.  
+- `src/collision.lua` (geometry helper) and `src/projectile.lua` (bullet class) remain required and unchanged.  
+- Fixing the pointer alias ensures projectiles properly damage enemies again.  
+- The new structure cleanly separates concerns:
+  - `collision.lua` → math utility  
+  - `systems/collisions.lua` → logic coordination  
+  - `systems/projectiles.lua` → projectile management  
+
+**Next Steps**
+
+1. Add player ↔ enemy collision detection (contact damage).  
+2. Implement projectile ↔ terrain collisions once map tiles are introduced.  
+3. Create a debug toggle to visualize hitboxes for all collision participants.
+
+### [2025-10-31] — Step 17: Collectibles / Powerups (Scaffold)
+
+**Summary**
+
+Added a lightweight Items system with a simple collectible (“gem”).  
+Items bob visually, have their own colliders, can be spawned anywhere, and are collected on player overlap.  
+Collision handling is centralized (Step 16) and now includes player ↔ item checks. A running count is tracked.
+
+**Changes**
+
+- **`config.lua`**
+  - Added item tunables:
+    - `C.ITEM = { w = 8, h = 8, bob = 6, bobSpeed = 3 }`
+
+- **`src/item.lua`** (new)
+  - Item entity with: position, kind, collider (`w/h`), bobbing timer, `update`, `draw`, `getCollider`.
+
+- **`src/systems/items.lua`** (new)
+  - Items manager with: `init`, `spawn(x,y,kind)`, `update`, `draw`, `collect(index, player)`.
+  - Exposes `Items.list` and `Items.count` (total collected).
+
+- **`src/systems/collisions.lua`**
+  - Expanded API: `Collisions.update(dt, world, player, enemies, projectiles, items)`.
+  - Added **PLAYER ↔ ITEMS** AABB overlap; invokes `items.collect(i, player)` on contact.
+
+- **`src/player.lua`**
+  - Added `Player:getCollider()` returning the fixed hurtbox rect (pivot-based).
+
+- **`main.lua`**
+  - Required `src/systems/items.lua`.
+  - `Items.init()` in `love.load()`.
+  - Spawned example gems near the floor (e.g., X=260 and 440).
+  - Called `Items.update(dt)` each frame.
+  - Passed `Items` into `Collisions.update(...)`.
+  - Drew items in the world layer **before** player/enemies.
+
+**Notes**
+
+- Items are currently simple gold squares (placeholder art); bobbing is visual only and does not affect the pickup collider.
+- `Items.count` increments on collection; no HUD yet (to be added in a later step).
+- System follows our existing architecture (pivot-at-feet, fixed colliders, Layers, centralized collisions).
+
+**Next Steps**
+
+1. HUD counter to display `Items.count`.  
+2. Add item types (health, ammo, weapon powerup) with per-kind effects in `Items.collect`.  
+3. Optional SFX and sparkle animation on pickup.
+
+### [2025-10-31] — Step 18: Tilemap / Level Loader (Read-Only)
+
+**Summary**
+
+Introduced a basic tilemap system and Lua-based level files.  
+The map now renders visually with color-coded tiles and defines solid terrain for later collision logic.  
+This marks the transition from a static floor to data-driven levels.
+
+**Changes**
+
+- **`assets/levels/level1.lua`** (new)
+  - Defines a test map (80×12 tiles, 16 px each).
+  - Includes simple background layer and solid ground/platform rows.
+  - Returns a Lua table with:
+    - `tileSize`, `w`, `h`
+    - `layers.bg`
+    - `solids` grid (boolean).
+
+- **`src/tilemap.lua`** (new)
+  - Handles map loading, drawing, and tile queries.
+  - Provides methods:
+    - `Tilemap.load(path)` – loads Lua map data.
+    - `Tilemap:draw(cameraX, resW, resH)` – draws visible tile range.
+    - `Tilemap:isSolidAt(px, py)` – per-pixel solidity check.
+    - `Tilemap:aabbOverlapsSolid(x, y, w, h)` – AABB test for future collisions.
+
+- **`main.lua`**
+  - Added `local Tilemap = require("src.tilemap")`.
+  - Loaded the test level in `love.load()`:
+    ```lua
+    map = Tilemap.load("assets.levels.level1")
+    world.width  = map.worldWidth
+    world.height = map.worldHeight
+    ```
+  - Drew the map before entities in the world layer:
+    ```lua
+    if map then map:draw(camera and camera.x or 0, cfg.RES_W, cfg.RES_H) end
+    ```
+  - Updated UI header to indicate Step 18.
+
+**Notes**
+
+- The map currently serves as background only; solids are not yet used by physics.  
+- Camera and world width now scale to the level’s defined width.  
+- `Tilemap` queries (`isSolidAt`, `aabbOverlapsSolid`) will be used in Step 19 to handle terrain collisions for player and projectiles.
+
+**Next Steps**
+
+1. Add terrain collisions for player feet and bullets (use `isSolidAt` checks).  
+2. Create a simple tile-based renderer for visual variety (grass, rock, etc.).  
+3. Add a lightweight map editor or loader for multiple levels.
