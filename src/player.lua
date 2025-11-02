@@ -14,22 +14,22 @@ function Player.new(world)
   self.sh = cfg.SPRITES.player.frameH
 
   -- COLLIDER (gameplay) size, independent of sprite
-  self.cw  = (cfg.COLLIDER and cfg.COLLIDER.player.w)  or self.sw
-  self.ch  = (cfg.COLLIDER and cfg.COLLIDER.player.h)  or self.sh
+  self.cw = (cfg.COLLIDER and cfg.COLLIDER.player.w) or self.sw
+  self.ch = (cfg.COLLIDER and cfg.COLLIDER.player.h) or self.sh
   self.cox = (cfg.COLLIDER and cfg.COLLIDER.player.ox) or 0
   self.coy = (cfg.COLLIDER and cfg.COLLIDER.player.oy) or 0
 
   -- PIVOT: feet-center in world space
-  self.x = 32
-  self.y = world.floor
+  self.x = 32                   -- pivot X (feet center)
+  self.y = world.floor          -- pivot Y (on the floor)
 
   self.vx, self.vy = 0, 0
   self.speed   = cfg.PLAYER_SPEED
   self.jumpV   = cfg.PLAYER_JUMPV
   self.gravity = cfg.GRAVITY
-  self.onGround = true
-  self.facing   = 1
-  self.world    = world
+  self.onGround = false
+  self.facing = 1
+  self.world = world
 
   -- Try to fetch images (may be nil -> procedural fallback)
   local idleImg = Assets.get("player_idle")
@@ -70,11 +70,24 @@ local function chooseAnim(self)
   end
 end
 
--- Helper to get collider rect from pivot
+-- Helpers: collider rectangle from pivot
 local function colliderRect(self)
   local x = self.x - math.floor(self.cw / 2) + self.cox
   local y = self.y - self.ch + self.coy
   return x, y, self.cw, self.ch
+end
+
+-- Check if player's feet would be on solid ground at given position
+local function isGrounded(self, map, testY)
+  if not map then return testY >= self.world.floor end
+  
+  local cx, cy, cw, ch = colliderRect(self)
+  -- Check bottom edge (feet) + 1 pixel below
+  local feetY = testY
+  local leftX = self.x - math.floor(self.cw / 2)
+  local rightX = self.x + math.floor(self.cw / 2) - 1
+  
+  return map:isSolidAt(leftX, feetY + 1) or map:isSolidAt(rightX, feetY + 1)
 end
 
 function Player:update(dt, input, map)
@@ -92,54 +105,79 @@ function Player:update(dt, input, map)
     self.animJump:reset()
   end
 
-  -- integrate motion (pivot-based)
-  self.x = self.x + self.vx * dt
+  -- Apply gravity
   self.vy = self.vy + self.gravity * dt
-  self.y  = self.y + self.vy * dt
 
-  -- vertical resolve: prefer map tiles; fall back to legacy flat floor if no solids
-  local landedViaMap = false
-  if map then
-    local x, y, w, h = colliderRect(self)
-    local ts = map.ts
-
-    if self.vy > 0 then
-      -- falling: if overlapping a solid, snap feet to tile top
-      if map:aabbOverlapsSolid(x, y, w, h) then
-        local bottom     = y + h
-        local topOfSolid = math.floor(bottom / ts) * ts
-        self.y  = topOfSolid
-        self.vy = 0
-        self.onGround = true
-        landedViaMap = true
-      else
-        self.onGround = false
+  -- HORIZONTAL MOVEMENT with wall collision
+  if self.vx ~= 0 then
+    local newX = self.x + self.vx * dt
+    local cx, cy, cw, ch = colliderRect(self)
+    cy = self.y - self.ch
+    
+    -- Check left/right walls
+    if map then
+      local checkX = (self.vx > 0) and (newX + math.floor(cw/2)) or (newX - math.floor(cw/2))
+      local topY = cy
+      local botY = cy + ch - 1
+      
+      local hitWall = map:isSolidAt(checkX, topY) or 
+                      map:isSolidAt(checkX, topY + math.floor(ch/2)) or
+                      map:isSolidAt(checkX, botY)
+      
+      if not hitWall then
+        self.x = newX
       end
-
-    elseif self.vy < 0 then
-      -- jumping upward: bonk head and push just below solid
-      if map:aabbOverlapsSolid(x, y, w, h) then
-        local headTop        = y
-        local bottomOfSolid  = (math.floor(headTop / ts) + 1) * ts
-        self.y  = bottomOfSolid + self.ch
-        self.vy = 0
-      end
-
     else
-      -- idle vertical: probe 1px below feet to maintain grounded flag
-      local px, py = x, y + 1
-      self.onGround = map:aabbOverlapsSolid(px, py, w, h)
+      self.x = newX
     end
   end
 
-  -- legacy flat-floor fallback (keeps left side playable when no solids)
-  if (not landedViaMap) and self.y >= self.world.floor then
-    self.y = self.world.floor
-    self.vy = 0
-    self.onGround = true
+  -- VERTICAL MOVEMENT with ceiling/floor collision
+  local newY = self.y + self.vy * dt
+  local cx, cy, cw, ch = colliderRect(self)
+  
+  if map then
+    if self.vy > 0 then
+      -- Falling - check for ground
+      if isGrounded(self, map, newY) then
+        -- Snap to ground
+        local ts = map.ts
+        local tileY = math.floor(newY / ts)
+        self.y = tileY * ts
+        self.vy = 0
+        self.onGround = true
+      else
+        self.y = newY
+        self.onGround = false
+      end
+    elseif self.vy < 0 then
+      -- Rising - check for ceiling
+      local headY = newY - self.ch
+      local leftX = self.x - math.floor(self.cw / 2)
+      local rightX = self.x + math.floor(self.cw / 2) - 1
+      
+      if map:isSolidAt(leftX, headY) or map:isSolidAt(rightX, headY) then
+        -- Hit ceiling
+        self.vy = 0
+        local ts = map.ts
+        local tileY = math.floor(headY / ts) + 1
+        self.y = tileY * ts + self.ch
+      else
+        self.y = newY
+        self.onGround = false
+      end
+    end
+  else
+    -- Legacy floor collision
+    self.y = newY
+    if self.y >= self.world.floor then
+      self.y = self.world.floor
+      self.vy = 0
+      self.onGround = true
+    end
   end
 
-  -- clamp horizontally using collider width
+  -- Clamp horizontally to world bounds
   local half = math.floor(self.cw / 2)
   local maxX = (self.world.width or self.world.W) - half
   if self.x < half then self.x = half end
@@ -161,9 +199,9 @@ function Player:draw()
   -- Debug: draw collider box when overlay is visible
   if dbg.isVisible and dbg.isVisible() then
     local x, y, w, h = colliderRect(self)
-    love.graphics.setColor(1, 1, 0, 0.35)
+    love.graphics.setColor(1, 1, 0, 0.35)   -- translucent fill
     love.graphics.rectangle("fill", math.floor(x), math.floor(y), w, h)
-    love.graphics.setColor(1, 1, 0, 1)
+    love.graphics.setColor(1, 1, 0, 1)      -- outline
     love.graphics.rectangle("line", math.floor(x), math.floor(y), w, h)
     love.graphics.setColor(1, 1, 1, 1)
   end

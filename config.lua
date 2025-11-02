@@ -7,13 +7,13 @@ C.RES_H = 180
 C.SCALE_START = 3
 
 -- World settings
-C.WORLD_WIDTH  = 1024         -- simple scrollable width
-C.FLOOR_OFFSET = 20           -- distance from bottom to ground line
+C.WORLD_WIDTH  = 1024
+C.FLOOR_OFFSET = 20
 
 -- Player physics
-C.PLAYER_SPEED = 80           -- px/s
-C.PLAYER_JUMPV = -180         -- px/s impulse (upward)
-C.GRAVITY      = 420          -- px/s^2
+C.PLAYER_SPEED = 80
+C.PLAYER_JUMPV = -180
+C.GRAVITY      = 420
 
 -- Parallax factors (0 = static sky, 1 = world speed)
 C.PARALLAX = {
@@ -28,37 +28,38 @@ C.ANIM = {
   jump = 6,
 }
 
--- Sprite sheet configuration (optional)
--- Put your strips here if/when you add them. If these files are missing,
--- the game falls back to procedural frames.
+-- Sprite sheet configuration
 C.SPRITES = {
   player = {
     idlePath = "assets/gfx/player/idle_strip.png",
     runPath  = "assets/gfx/player/run_strip.png",
     jumpPath = "assets/gfx/player/jump_strip.png",
 
-    -- Frame dimensions
-    frameW = 24,  -- used for idle & run
+    frameW = 24,
     frameH = 35,
 
     idleFrames = 2,
     runFrames  = 6,
 
-    -- Jump animation uses its own frame size (22×20)
     jumpFrames = 4,
     jumpFrameW = 22,
     jumpFrameH = 20,
+  },
+  
+  -- NEW: Tileset configuration
+  tileset = {
+    path = "assets/gfx/tiles/tileset.png",
+    tileSize = 16,  -- must match level tile size
   }
 }
 
-
 -- Colors (RGBA 0..1)
 C.COLORS = {
-  sky       = {0.22, 0.62, 0.92, 1.0},  -- bright blue sky
+  sky       = {0.22, 0.62, 0.92, 1.0},
   hill_far  = {0.20, 0.36, 0.50, 1.0},
   hill_near = {0.18, 0.28, 0.42, 1.0},
 
-  bg     = {0.08, 0.08, 0.10, 1.0},   -- legacy background (kept for UI clears)
+  bg     = {0.08, 0.08, 0.10, 1.0},
   floor  = {0.50, 0.50, 0.60, 1.0},
   accent = {0.20, 0.80, 0.30, 1.0},
   player = {0.20, 0.90, 0.30, 1.0},
@@ -68,30 +69,32 @@ C.COLORS = {
 -- Gameplay collider (independent of sprite size)
 C.COLLIDER = {
   player = {
-    w = 20,   -- collider width (tune 18–22)
-    h = 30,   -- collider height (tune 28–32)
-    ox = 0,   -- optional fine offset X (pixels)
-    oy = 0,   -- optional fine offset Y (pixels)
+    w = 20,
+    h = 30,
+    ox = 0,
+    oy = 0,
   }
 }
 
--- Player projectile (single bullet)
+-- Player projectile
 C.PROJ = {
-  w = 6,           -- width in pixels
-  h = 2,           -- height in pixels
-  speed = 260,     -- px/s
-  life  = 0.9,     -- seconds
-  muzzleX = 8,     -- offset from pivot X in facing direction
-  muzzleY = -18,   -- offset from pivot Y (negative = above feet)
+  w = 6,
+  h = 2,
+  speed = 260,
+  life  = 0.9,
+  muzzleX = 8,
+  muzzleY = -18,
+  dmg = 1,
 }
 
+-- Enemy configuration
 C.ENEMY = {
   spriteW = 16,
   spriteH = 16,
 
   COLLIDER = {
     w = 18,
-    h = 36,   -- ← increased from 28 (or so) to 36 px tall
+    h = 36,
     ox = 0,
     oy = 0,
   },
@@ -100,24 +103,18 @@ C.ENEMY = {
   walkFrames    = 4,
   animIdleFPS   = 3,
   animWalkFPS   = 8,
+  
+  hp          = 2,
+  hitFlash    = 0.12,
+  deathTime   = 0.25,
 }
-
--- Bullet damage
-C.PROJ.dmg = 1
-
--- Enemy defaults
-C.ENEMY = C.ENEMY or {}
-C.ENEMY.hp          = 2      -- hits to kill
-C.ENEMY.hitFlash    = 0.12   -- seconds of red flash
-C.ENEMY.deathTime   = 0.25   -- seconds before removal once hp <= 0
 
 -- Collectible defaults
 C.ITEM = {
-  w = 8,        -- collider width
-  h = 8,        -- collider height
-  bob = 6,      -- bobbing amplitude (px)
-  bobSpeed = 3, -- bobbing speed (Hz-ish)
+  w = 8,
+  h = 8,
+  bob = 6,
+  bobSpeed = 3,
 }
-
 
 return C

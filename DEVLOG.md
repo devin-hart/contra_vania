@@ -685,26 +685,40 @@ This marks the transition from a static floor to data-driven levels.
 2. Create a simple tile-based renderer for visual variety (grass, rock, etc.).  
 3. Add a lightweight map editor or loader for multiple levels.
 
-### [2025-10-31] — Step 19: Tilemap Collision + Visible Solids (WIP)
+### [2025-11-02] — Step 19: Terrain Collision
 
-**Summary:**
-Expanded the tilemap system to draw visible platforms and improved player vertical collision logic.  
-Player now correctly lands, jumps, and walks on solid tiles rather than the legacy flat floor.  
-Solids are visually represented for debugging and alignment checks.
+**Summary**
+Implemented full tilemap collision for player, enemies, and projectiles.
+The game now uses level geometry instead of the flat floor system.
 
 **Changes**
-- Added solid-tile rendering to `tilemap.lua` (`Tilemap:draw`) so platforms are visible.
-- Updated `player.lua` vertical collision logic:
-  - Player feet now snap precisely to the top of solids using collider bottom.
-  - Added a fallback to legacy flat floor when no tilemap collision is detected.
-  - Fixed `onGround` logic for consistent animation state.
-- Confirmed that player physics and animations behave correctly across raised platforms.
+- **`src/player.lua`**
+  - Added terrain collision for feet, walls, and ceilings
+  - Player now walks on platforms and can't phase through walls
+  - Gravity applied properly with ground snapping
+  
+- **`src/enemy.lua`**
+  - Enemies respect terrain and won't walk off ledges
+  - Added gravity system for enemies
+  - Turn around at walls or patrol bounds
+  
+- **`src/systems/projectiles.lua`**
+  - Bullets now despawn on tile collision
+  - Multi-point collision check for accuracy
+  
+- **`cv_debug.lua`**
+  - Added `drawTilemap()` to visualize solid tiles (red overlay)
+  - Added `drawColliders()` to show all entity hitboxes
+  
+- **`main.lua`**
+  - Pass `map` to all systems that need collision
+  - Removed legacy floor line rendering
+  - Added gem counter to UI
 
-**Notes**
-- Player now collides with both legacy floor and map tiles.
-- Left edge remains flat-ground fallback.
-- Green platforms represent `solids` defined in `assets/levels/level1.lua`.
-- Next step will hide debug platforms and replace them with graphical tiles or tileset rendering.
+**Next Steps**
+1. Spawn items on terrain (auto-find ground below spawn point)
+2. Add camera improvements (smoothing, look-ahead)
+3. Player movement polish (coyote time, jump buffering)
 
 ### [2025-10-31] — Step 20: Debug Overlay (Tile Solids + Colliders)
 
@@ -728,3 +742,4 @@ This system ties into the existing `cv_debug` overlay (toggled with F1), allowin
 - Solids outlined in **red**; player collider in **yellow**, enemies in **magenta**.
 - Works across all levels and scales correctly with camera movement.
 - Useful for aligning tile collision data and sprite hitboxes before switching to final tileset art.
+

@@ -16,7 +16,6 @@ local Tilemap    = require("src.tilemap")
 local player, camera, viewport, map
 local enemies = {}
 
--- World definition
 local world = {
   width  = cfg.WORLD_WIDTH,
   height = cfg.RES_H,
@@ -32,20 +31,21 @@ function love.load()
     { resizable = true, minwidth = cfg.RES_W, minheight = cfg.RES_H }
   )
 
-  -- Preload optional sprites (safe if missing)
+  -- Load all assets
   Assets.loadAll({
     player_idle = cfg.SPRITES.player.idlePath,
     player_run  = cfg.SPRITES.player.runPath,
     player_jump = cfg.SPRITES.player.jumpPath,
     enemy_idle  = "assets/gfx/enemy/idle_strip.png",
     enemy_walk  = "assets/gfx/enemy/walk_strip.png",
+    tileset     = cfg.SPRITES.tileset.path,  -- NEW: optional tileset
   })
 
   -- Load level
   map = Tilemap.load("assets.levels.level1")
   world.width  = map.worldWidth
   world.height = map.worldHeight
-  world.floor  = cfg.RES_H - cfg.FLOOR_OFFSET   -- legacy floor still active
+  world.floor  = cfg.RES_H - cfg.FLOOR_OFFSET
 
   viewport = Viewport.new(cfg.RES_W, cfg.RES_H, cfg.SCALE_START)
   player   = Player.new(world)
@@ -53,17 +53,17 @@ function love.load()
   Projectiles.init()
   Items.init()
 
-  -- sample items
+  -- Sample items
   Items.spawn(260, world.floor - 10, "gem")
   Items.spawn(440, world.floor - 10, "gem")
 
-  -- sample enemies
+  -- Sample enemies
   enemies = {
     Enemy.new{ x = 200, y = world.floor, patrolMin = 180, patrolMax = 260, speed = 30 },
     Enemy.new{ x = 380, y = world.floor, patrolMin = 360, patrolMax = 460, speed = 45 },
   }
 
-  dbg.log("boot", "initialized viewport, assets, map, player, enemies, camera")
+  dbg.log("boot", "Step 21: enhanced visuals with tileset support")
 end
 
 function love.resize()
@@ -73,25 +73,22 @@ end
 function love.update(dt)
   dbg.update(dt)
 
-  -- Player + camera
   if player then player:update(dt, Input, map) end
   if camera and player then camera:update(player, world, cfg.RES_W, cfg.RES_H) end
 
-  -- Fire
   if Input.wasPressed("shoot") and player then
     local mx, my, dir = player:getMuzzle()
     Projectiles.spawn(mx, my, dir)
   end
 
-  -- Update systems
   Projectiles.update(dt, map)
   Items.update(dt)
   Collisions.update(dt, world, player, enemies, Projectiles, Items)
 
-  -- Enemy logic + cleanup
   for i = 1, #enemies do
-    enemies[i]:update(dt, world)
+    enemies[i]:update(dt, world, map)
   end
+  
   local e = 1
   while e <= #enemies do
     local en = enemies[e]
@@ -107,8 +104,8 @@ end
 
 function love.keypressed(key)
   Input.keypressed(key)
-  if Input.wasPressed("debug") then dbg.toggle() end   -- F1
-  if Input.wasPressed("dump")  then dbg.dump()   end   -- F2
+  if Input.wasPressed("debug") then dbg.toggle() end
+  if Input.wasPressed("dump")  then dbg.dump()   end
   if Input.wasPressed("quit")  then love.event.quit() end
 end
 
@@ -120,14 +117,14 @@ function love.draw()
   viewport:begin()
   Layers.begin()
 
-  -- Background (static)
+  -- ENHANCED BACKGROUND with multiple parallax layers
   Layers.add("background", function()
     Background.draw(camera and camera.x or 0, cfg.RES_W, cfg.RES_H)
   end)
 
-  -- World (camera)
+  -- WORLD with improved tile rendering
   Layers.add("world", function()
-    -- MAP (draw behind everything else)
+    -- Enhanced tilemap with procedural detail or tileset sprites
     if map then map:draw(camera and camera.x or 0, cfg.RES_W, cfg.RES_H) end
 
     -- Entities
@@ -136,16 +133,11 @@ function love.draw()
     if player then player:draw() end
     for i = 1, #enemies do enemies[i]:draw() end
 
-    -- Debug: world-space overlays (solids + colliders)
+    -- Debug overlays
     if dbg.isVisible() then
       dbg.drawTilemap(map)
       dbg.drawColliders(player, enemies)
     end
-
-    -- (optional) floor line for legacy reference
-    love.graphics.setColor(cfg.COLORS.floor)
-    love.graphics.line(0, world.floor, world.width, world.floor)
-    love.graphics.setColor(1,1,1,1)
   end)
 
   -- UI
@@ -153,12 +145,12 @@ function love.draw()
     love.graphics.setColor(cfg.COLORS.accent)
     love.graphics.rectangle("line", 8, 8, cfg.RES_W - 16, cfg.RES_H - 16)
     love.graphics.setColor(cfg.COLORS.white)
-    love.graphics.print("Contra-Vania — Step 20 (debug overlays)", 10, 10)
+    love.graphics.print("Contra-Vania — Step 21 (enhanced visuals)", 10, 10)
+    love.graphics.print("Gems: " .. Items.count, 10, 22)
   end)
 
   Layers.draw({ camera = camera })
   viewport:finish()
 
-  -- Screen-space debug HUD
   dbg.draw()
 end

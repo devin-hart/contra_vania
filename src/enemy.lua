@@ -3,19 +3,15 @@ local Anim   = require("src.anim")
 local Assets = require("src.assets")
 local dbg    = require("cv_debug")
 
--- Patrolling enemy with pivot-at-feet and fixed collider.
 local Enemy = {}
 Enemy.__index = Enemy
 
--- opts: { x, y, patrolMin, patrolMax, speed }
 function Enemy.new(opts)
   local self = setmetatable({}, Enemy)
 
-  -- PIVOT (feet-center). If y not given, caller should pass world.floor.
   self.x = assert(opts.x, "Enemy.new: x required")
   self.y = assert(opts.y, "Enemy.new: y required")
 
-  -- Patrol bounds (inclusive)
   self.patrolMin = assert(opts.patrolMin, "Enemy.new: patrolMin required")
   self.patrolMax = assert(opts.patrolMax, "Enemy.new: patrolMax required")
   if self.patrolMin > self.patrolMax then
@@ -23,20 +19,18 @@ function Enemy.new(opts)
   end
 
   self.speed = opts.speed or 40
-  self.dir   = 1  -- 1:right, -1:left
+  self.dir   = 1
+  self.vy    = 0  -- vertical velocity for gravity
 
-  -- SPRITE dimensions (use config if present, else fallback)
   self.sw = (cfg.ENEMY and cfg.ENEMY.spriteW) or 16
   self.sh = (cfg.ENEMY and cfg.ENEMY.COLLIDER and cfg.ENEMY.COLLIDER.h) or 16
 
-  -- COLLIDER (hurtbox) independent of sprite size
   local ecoll = (cfg.ENEMY and cfg.ENEMY.COLLIDER) or {}
   self.cw  = ecoll.w  or 14
   self.ch  = opts.customH or ecoll.h or 14
   self.cox = ecoll.ox or 0
   self.coy = ecoll.oy or 0
 
-  -- Try to load sprites (optional). Fallback: procedural anim.
   local idleImg = Assets.get("enemy_idle") or Assets.loadOptional("enemy_idle", "assets/gfx/enemy/idle_strip.png")
   local walkImg = Assets.get("enemy_walk") or Assets.loadOptional("enemy_walk", "assets/gfx/enemy/walk_strip.png")
 
@@ -56,7 +50,6 @@ function Enemy.new(opts)
   }
 
   self.anim = self.animWalk
-    -- Health / hit feedback
   self.hp        = (cfg.ENEMY and cfg.ENEMY.hp) or 1
   self.hitTimer  = 0
   self.deathTime = 0
@@ -65,7 +58,6 @@ function Enemy.new(opts)
   return self
 end
 
--- Collider rectangle (from pivot)
 function Enemy:getCollider()
   local x = self.x - math.floor(self.cw / 2) + self.cox
   local y = self.y - self.ch + self.coy
@@ -82,33 +74,76 @@ function Enemy:takeDamage(dmg)
   end
 end
 
-function Enemy:update(dt, world)
-      -- death countdown
+-- Check if there's ground ahead (prevent walking off ledges)
+local function hasGroundAhead(self, map, checkX)
+  if not map then return true end
+  local feetY = self.y + 1
+  return map:isSolidAt(checkX, feetY)
+end
+
+-- Check if there's a wall ahead
+local function hasWallAhead(self, map, checkX)
+  if not map then return false end
+  local topY = self.y - self.ch
+  local midY = self.y - math.floor(self.ch / 2)
+  return map:isSolidAt(checkX, topY) or map:isSolidAt(checkX, midY)
+end
+
+function Enemy:update(dt, world, map)
   if self.dead then
     self.deathTime = self.deathTime - dt
     return
   end
 
-  -- tick hit flash
   if self.hitTimer and self.hitTimer > 0 then
     self.hitTimer = self.hitTimer - dt
     if self.hitTimer < 0 then self.hitTimer = 0 end
   end
-  -- Patrol movement
-  self.x = self.x + self.dir * self.speed * dt
 
-  if self.x >= self.patrolMax then
-    self.x = self.patrolMax
-    self.dir = -1
-  elseif self.x <= self.patrolMin then
-    self.x = self.patrolMin
-    self.dir = 1
+  -- Apply gravity if using tilemap
+  if map then
+    self.vy = self.vy + cfg.GRAVITY * dt
+    local newY = self.y + self.vy * dt
+    
+    -- Check for ground
+    local feetY = newY + 1
+    local leftX = self.x - math.floor(self.cw / 2)
+    local rightX = self.x + math.floor(self.cw / 2) - 1
+    
+    if map:isSolidAt(leftX, feetY) or map:isSolidAt(rightX, feetY) then
+      -- Snap to ground
+      local ts = map.ts
+      local tileY = math.floor(newY / ts)
+      self.y = tileY * ts
+      self.vy = 0
+    else
+      self.y = newY
+    end
+  else
+    -- Legacy floor
+    self.y = world.floor
   end
 
-  -- Keep feet on floor (pivot = feet-center)
-  self.y = world.floor
+  -- Horizontal patrol movement
+  local newX = self.x + self.dir * self.speed * dt
+  local halfW = math.floor(self.cw / 2)
+  local lookAhead = self.dir > 0 and (newX + halfW + 2) or (newX - halfW - 2)
+  
+  -- Check for walls or ledges
+  local hitWall = map and hasWallAhead(self, map, lookAhead)
+  local noGround = map and not hasGroundAhead(self, map, lookAhead)
+  local atBounds = newX >= self.patrolMax or newX <= self.patrolMin
+  
+  if hitWall or noGround or atBounds then
+    -- Turn around
+    self.dir = -self.dir
+    if atBounds then
+      self.x = (newX >= self.patrolMax) and self.patrolMax or self.patrolMin
+    end
+  else
+    self.x = newX
+  end
 
-  -- Choose anim
   self.anim = self.dir ~= 0 and self.animWalk or self.animIdle
   self.anim:update(dt)
 end
@@ -126,11 +161,9 @@ function Enemy:draw()
   local dy = self.y - ay
 
   if self.anim and self.anim.image then
-    -- Sprite sheet exists: tint the image
     if flash then love.graphics.setColor(1, 0.25, 0.25, alpha) else love.graphics.setColor(1, 1, 1, alpha) end
     self.anim:draw(dx, dy, flip)
   else
-    -- Procedural fallback: draw our own rectangle so flash color isn't overridden
     local r,g,b = (flash and 1 or 0.4), (flash and 0.25 or 0.9), (flash and 0.25 or 0.4)
     love.graphics.setColor(r, g, b, alpha)
     local x, y, w, h = self:getCollider()
@@ -138,7 +171,6 @@ function Enemy:draw()
     love.graphics.setColor(1, 1, 1, 1)
   end
 
-    -- Facing direction indicator (small line above head)
   local lineLen = 6
   local lx1 = self.x
   local ly1 = self.y - self.sh - 2
@@ -147,15 +179,14 @@ function Enemy:draw()
   love.graphics.line(lx1, ly1, lx2, ly1)
   love.graphics.setColor(1, 1, 1, 1)
 
-  -- Debug collider overlay
   if dbg.isVisible and dbg.isVisible() then
     local x, y, w, h = self:getCollider()
-    love.graphics.setColor(1, 1, 0, 0.35); love.graphics.rectangle("fill", x, y, w, h)
-    love.graphics.setColor(1, 1, 0, 1);    love.graphics.rectangle("line", x, y, w, h)
+    love.graphics.setColor(1, 1, 0, 0.35)
+    love.graphics.rectangle("fill", x, y, w, h)
+    love.graphics.setColor(1, 1, 0, 1)
+    love.graphics.rectangle("line", x, y, w, h)
     love.graphics.setColor(1, 1, 1, 1)
   end
 end
-
-
 
 return Enemy
