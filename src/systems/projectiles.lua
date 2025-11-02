@@ -1,13 +1,12 @@
 local cfg       = require("config")
 local Projectile= require("src.projectile")
-local Collision = require("src.collision")
 
 local P = {}
 local bullets = {}
 
 function P.init()
-    bullets = {}
-    P.list = bullets
+  bullets = {}
+  P.list = bullets
 end
 
 function P.spawn(mx, my, dir)
@@ -18,21 +17,25 @@ function P.update(dt, map)
   if #bullets == 0 then return end
   local i = 1
   while i <= #bullets do
-    local b = bullets[i]
-    local alive = b:update(dt)
-
-    local hitTerrain = false
-    if map then
-      local x, y, w, h = b:getCollider()
-      if map:aabbOverlapsSolid(x, y, w, h) then
-        hitTerrain = true
+    local alive = bullets[i]:update(dt)
+    
+    -- Check terrain collision if map exists
+    if alive and map then
+      local bx, by, bw, bh = bullets[i]:getCollider()
+      -- Check center and edges of bullet
+      local hitTile = map:isSolidAt(bx + bw/2, by + bh/2) or
+                      map:isSolidAt(bx, by) or
+                      map:isSolidAt(bx + bw, by)
+      
+      if hitTile then
+        alive = false
       end
     end
-
-    if hitTerrain or not alive then
-      table.remove(bullets, i)   -- do not increment i; next item shifts into i
-    else
+    
+    if alive then
       i = i + 1
+    else
+      table.remove(bullets, i)
     end
   end
 end
