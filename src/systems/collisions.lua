@@ -17,13 +17,15 @@ function Collisions.update(dt, world, player, enemies, projectiles, items)
 
       for e = 1, #enemies do
         local enemy = enemies[e]
-        local ex, ey, ew, eh = enemy:getCollider()
-        if Collision.rectsOverlap(bx, by, bw, bh, ex, ey, ew, eh) then
-          if enemy.takeDamage then
-            enemy:takeDamage(cfg.PROJ.dmg or 1)
+        if not enemy.dead then
+          local ex, ey, ew, eh = enemy:getCollider()
+          if Collision.rectsOverlap(bx, by, bw, bh, ex, ey, ew, eh) then
+            if enemy.takeDamage then
+              enemy:takeDamage(cfg.PROJ.dmg or 1)
+            end
+            hit = true
+            break
           end
-          hit = true
-          break
         end
       end
 
@@ -35,7 +37,7 @@ function Collisions.update(dt, world, player, enemies, projectiles, items)
     end
   end
 
-    -- PLAYER ↔ ITEMS
+  -- PLAYER ↔ ITEMS
   if player and player.getCollider and items and items.list and #items.list > 0 then
     local px, py, pw, ph = player:getCollider()
     local i = 1
@@ -49,8 +51,23 @@ function Collisions.update(dt, world, player, enemies, projectiles, items)
     end
   end
 
-
-  -- (Future) PLAYER ↔ ENEMY, PLAYER ↔ PICKUPS, etc. go here.
+  -- PLAYER ↔ ENEMY (contact damage)
+  if player and player.getCollider and #enemies > 0 then
+    local px, py, pw, ph = player:getCollider()
+    
+    for e = 1, #enemies do
+      local enemy = enemies[e]
+      if not enemy.dead then
+        local ex, ey, ew, eh = enemy:getCollider()
+        if Collision.rectsOverlap(px, py, pw, ph, ex, ey, ew, eh) then
+          if player.takeDamage then
+            -- Pass enemy X position for knockback direction
+            player:takeDamage(1, enemy.x)
+          end
+        end
+      end
+    end
+  end
 end
 
 return Collisions

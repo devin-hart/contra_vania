@@ -2,6 +2,7 @@ local cfg    = require("config")
 local Anim   = require("src.anim")
 local Assets = require("src.assets")
 local dbg    = require("cv_debug")
+local Audio  = require("src.audio")
 
 local Player = {}
 Player.__index = Player
@@ -9,29 +10,22 @@ Player.__index = Player
 function Player.new(world)
   local self = setmetatable({}, Player)
 
-  -- SPRITE size from sheet (used only for drawing)
   self.sw = cfg.SPRITES.player.frameW
   self.sh = cfg.SPRITES.player.frameH
+  self.jumpSW = cfg.SPRITES.player.jumpFrameW or self.sw
+  self.jumpSH = cfg.SPRITES.player.jumpFrameH or self.sh
 
-  -- COLLIDER (gameplay) size, independent of sprite
-  self.cw = (cfg.COLLIDER and cfg.COLLIDER.player.w) or self.sw
-  self.ch = (cfg.COLLIDER and cfg.COLLIDER.player.h) or self.sh
-  self.cox = (cfg.COLLIDER and cfg.COLLIDER.player.ox) or 0
-  self.coy = (cfg.COLLIDER and cfg.COLLIDER.player.oy) or 0
-
-  -- PIVOT: feet-center in world space
-  self.x = 32                   -- pivot X (feet center)
-  self.y = world.floor          -- pivot Y (on the floor)
+  self.x = 32
+  self.y = world.floor - 15
 
   self.vx, self.vy = 0, 0
   self.speed   = cfg.PLAYER_SPEED
   self.jumpV   = cfg.PLAYER_JUMPV
   self.gravity = cfg.GRAVITY
   self.onGround = false
-  self.facing = 1
-  self.world = world
+  self.facing   = 1
+  self.world    = world
 
-  -- Try to fetch images (may be nil -> procedural fallback)
   local idleImg = Assets.get("player_idle")
   local runImg  = Assets.get("player_run")
   local jumpImg = Assets.get("player_jump")
@@ -46,14 +40,30 @@ function Player.new(world)
   }
   self.animJump = Anim.new{
     image   = jumpImg,
-    frameW  = cfg.SPRITES.player.jumpFrameW or cfg.SPRITES.player.frameW,
-    frameH  = cfg.SPRITES.player.jumpFrameH or cfg.SPRITES.player.frameH,
+    frameW  = self.jumpSW,
+    frameH  = self.jumpSH,
     frames  = cfg.SPRITES.player.jumpFrames,
     fps     = cfg.ANIM.jump,
     loop    = false
   }
 
   self.anim = self.animIdle
+  
+  self.hp = 3
+  self.maxHp = 3
+  self.ammo = math.huge
+  self.maxAmmo = math.huge
+  
+  self.invincible = false
+  self.invincibleTimer = 0
+  self.invincibleDuration = 1.5
+  self.damageFlashTimer = 0
+  
+  self.hitstunTimer = 0
+  self.hitstunDuration = 0.3
+  self.knockbackVelX = 0
+  self.knockbackVelY = 0
+  
   return self
 end
 
@@ -70,139 +80,200 @@ local function chooseAnim(self)
   end
 end
 
--- Helpers: collider rectangle from pivot
-local function colliderRect(self)
-  local x = self.x - math.floor(self.cw / 2) + self.cox
-  local y = self.y - self.ch + self.coy
-  return x, y, self.cw, self.ch
+local function getSpriteSize(self)
+  if self.onGround then
+    return self.sw, self.sh
+  else
+    return self.jumpSW, self.jumpSH
+  end
 end
 
--- Check if player's feet would be on solid ground at given position
-local function isGrounded(self, map, testY)
-  if not map then return testY >= self.world.floor end
-  
-  local cx, cy, cw, ch = colliderRect(self)
-  -- Check bottom edge (feet) + 1 pixel below
-  local feetY = testY
-  local leftX = self.x - math.floor(self.cw / 2)
-  local rightX = self.x + math.floor(self.cw / 2) - 1
-  
-  return map:isSolidAt(leftX, feetY + 1) or map:isSolidAt(rightX, feetY + 1)
+function Player:getCollider()
+  local sw, sh = getSpriteSize(self)
+  local w = math.floor(sw * 0.8)
+  local h = math.floor(sh * 0.9)
+  local x = self.x - math.floor(w / 2)
+  local y = self.y - math.floor(h / 2)
+  return x, y, w, h
+end
+
+local function getFeetY(self)
+  local _, sh = getSpriteSize(self)
+  return self.y + math.floor(sh / 2)
+end
+
+local function getHeadY(self)
+  local _, sh = getSpriteSize(self)
+  return self.y - math.floor(sh / 2)
 end
 
 function Player:update(dt, input, map)
-  -- horizontal input
-  local left  = input and input.isDown and input.isDown("left")
-  local right = input and input.isDown and input.isDown("right")
-  self.vx = 0
-  if left  then self.vx = self.vx - self.speed; self.facing = -1 end
-  if right then self.vx = self.vx + self.speed; self.facing =  1 end
-
-  -- jump (edge-triggered)
-  if input and input.wasPressed and input.wasPressed("jump") and self.onGround then
-    self.vy = self.jumpV
-    self.onGround = false
-    self.animJump:reset()
+  local inHistun = self.hitstunTimer > 0
+  
+  -- Update timers
+  if self.invincible then
+    self.invincibleTimer = self.invincibleTimer - dt
+    if self.invincibleTimer <= 0 then
+      self.invincible = false
+      self.invincibleTimer = 0
+    end
   end
-
-  -- Apply gravity
-  self.vy = self.vy + self.gravity * dt
-
-  -- HORIZONTAL MOVEMENT with wall collision
-  if self.vx ~= 0 then
-    local newX = self.x + self.vx * dt
-    local cx, cy, cw, ch = colliderRect(self)
-    cy = self.y - self.ch
+  
+  if self.damageFlashTimer > 0 then
+    self.damageFlashTimer = self.damageFlashTimer - dt
+  end
+  
+  if self.hitstunTimer > 0 then
+    self.hitstunTimer = self.hitstunTimer - dt
+  end
+  
+  -- Apply knockback velocity during hitstun
+  if inHistun then
+    self.vx = self.knockbackVelX
+    if self.knockbackVelY ~= 0 then
+      self.vy = self.knockbackVelY
+      self.knockbackVelY = 0  -- Only apply upward pop once
+    end
+  else
+    -- Normal input (only when not in hitstun)
+    local left  = input and input.isDown and input.isDown("left")
+    local right = input and input.isDown and input.isDown("right")
+    self.vx = 0
+    if left  then self.vx = self.vx - self.speed; self.facing = -1 end
+    if right then self.vx = self.vx + self.speed; self.facing =  1 end
     
-    -- Check left/right walls
-    if map then
-      local checkX = (self.vx > 0) and (newX + math.floor(cw/2)) or (newX - math.floor(cw/2))
-      local topY = cy
-      local botY = cy + ch - 1
-      
-      local hitWall = map:isSolidAt(checkX, topY) or 
-                      map:isSolidAt(checkX, topY + math.floor(ch/2)) or
-                      map:isSolidAt(checkX, botY)
-      
-      if not hitWall then
-        self.x = newX
-      end
-    else
-      self.x = newX
+    -- Jump
+    if input and input.wasPressed and input.wasPressed("jump") and self.onGround then
+      self.vy = self.jumpV
+      self.onGround = false
+      self.animJump:reset()
+      Audio.playSFX("jump")
     end
   end
 
-  -- VERTICAL MOVEMENT with ceiling/floor collision
+  -- Gravity
+  self.vy = self.vy + self.gravity * dt
+
+  -- HORIZONTAL MOVEMENT
+  if self.vx ~= 0 then
+    local newX = self.x + self.vx * dt
+    local oldX = self.x
+    self.x = newX
+    
+    if map then
+      local cx, cy, cw, ch = self:getCollider()
+      if map:aabbOverlapsSolid(cx, cy, cw, ch) then
+        self.x = oldX
+        self.vx = 0
+        self.knockbackVelX = 0  -- Stop knockback on wall hit
+      end
+    end
+  end
+
+  -- VERTICAL MOVEMENT
   local newY = self.y + self.vy * dt
-  local cx, cy, cw, ch = colliderRect(self)
+  self.y = newY
   
   if map then
-    if self.vy > 0 then
-      -- Falling - check for ground
-      if isGrounded(self, map, newY) then
-        -- Snap to ground
-        local ts = map.ts
-        local tileY = math.floor(newY / ts)
-        self.y = tileY * ts
+    local cx, cy, cw, ch = self:getCollider()
+    local ts = map.ts
+    
+    if self.vy >= 0 then
+      local feetY = getFeetY(self)
+      local leftX = cx + 2
+      local rightX = cx + cw - 2
+      
+      if map:isSolidAt(leftX, feetY) or map:isSolidAt(rightX, feetY) then
+        local tileY = math.floor(feetY / ts)
+        local groundY = tileY * ts
+        local _, sh = getSpriteSize(self)
+        self.y = groundY - math.floor(sh / 2)
         self.vy = 0
         self.onGround = true
       else
-        self.y = newY
         self.onGround = false
       end
-    elseif self.vy < 0 then
-      -- Rising - check for ceiling
-      local headY = newY - self.ch
-      local leftX = self.x - math.floor(self.cw / 2)
-      local rightX = self.x + math.floor(self.cw / 2) - 1
       
-      if map:isSolidAt(leftX, headY) or map:isSolidAt(rightX, headY) then
-        -- Hit ceiling
+    elseif self.vy < 0 then
+      if map:aabbOverlapsSolid(cx, cy, cw, ch) then
+        local headY = getHeadY(self)
+        local tileY = math.floor(headY / ts)
+        local ceilingY = (tileY + 1) * ts
+        local _, sh = getSpriteSize(self)
+        self.y = ceilingY + math.floor(sh / 2)
         self.vy = 0
-        local ts = map.ts
-        local tileY = math.floor(headY / ts) + 1
-        self.y = tileY * ts + self.ch
-      else
-        self.y = newY
+      end
+    end
+    
+    if self.onGround and self.vy == 0 then
+      local feetY = getFeetY(self) + 2
+      local leftX = cx + 2
+      local rightX = cx + cw - 2
+      if not (map:isSolidAt(leftX, feetY) or map:isSolidAt(rightX, feetY)) then
         self.onGround = false
       end
     end
   else
-    -- Legacy floor collision
-    self.y = newY
-    if self.y >= self.world.floor then
-      self.y = self.world.floor
+    local feetY = getFeetY(self)
+    if feetY >= self.world.floor then
+      local _, sh = getSpriteSize(self)
+      self.y = self.world.floor - math.floor(sh / 2)
       self.vy = 0
       self.onGround = true
+    else
+      self.onGround = false
     end
   end
 
-  -- Clamp horizontally to world bounds
-  local half = math.floor(self.cw / 2)
-  local maxX = (self.world.width or self.world.W) - half
-  if self.x < half then self.x = half end
+  local cx, cy, cw, ch = self:getCollider()
+  local minX = math.floor(cw / 2)
+  local maxX = (self.world.width or 320) - math.floor(cw / 2)
+  if self.x < minX then self.x = minX end
   if self.x > maxX then self.x = maxX end
 
-  -- state → animation
   chooseAnim(self)
   self.anim:update(dt)
 end
 
 function Player:draw()
-  -- Draw sprite aligned to pivot using a default anchor: (sw/2, sh) i.e., feet-center
   local flip = (self.facing < 0)
-  local ax, ay = math.floor(self.sw / 2), self.sh
-  local drawX = self.x - ax
-  local drawY = self.y - ay
+  local sw, sh = getSpriteSize(self)
+  local drawX = self.x - math.floor(sw / 2)
+  local drawY = self.y - math.floor(sh / 2)
+  
+  if self.damageFlashTimer > 0 then
+    love.graphics.setColor(1, 0.3, 0.3, 1)
+  elseif self.invincible and math.floor(self.invincibleTimer * 10) % 2 == 0 then
+    love.graphics.setColor(1, 1, 1, 0.3)
+  else
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+  
   self.anim:draw(drawX, drawY, flip)
+  love.graphics.setColor(1, 1, 1, 1)
 
-  -- Debug: draw collider box when overlay is visible
   if dbg.isVisible and dbg.isVisible() then
-    local x, y, w, h = colliderRect(self)
-    love.graphics.setColor(1, 1, 0, 0.35)   -- translucent fill
-    love.graphics.rectangle("fill", math.floor(x), math.floor(y), w, h)
-    love.graphics.setColor(1, 1, 0, 1)      -- outline
-    love.graphics.rectangle("line", math.floor(x), math.floor(y), w, h)
+    local cx, cy, cw, ch = self:getCollider()
+    
+    local hitboxColor = self.invincible and {0, 1, 1, 0.35} or {1, 1, 0, 0.35}
+    love.graphics.setColor(hitboxColor)
+    love.graphics.rectangle("fill", cx, cy, cw, ch)
+    love.graphics.setColor(self.invincible and {0, 1, 1, 1} or {1, 1, 0, 1})
+    love.graphics.rectangle("line", cx, cy, cw, ch)
+    
+    local sw, sh = getSpriteSize(self)
+    love.graphics.setColor(1, 0, 0, 1)
+    love.graphics.rectangle("line", self.x - sw/2, self.y - sh/2, sw, sh)
+    
+    love.graphics.setColor(0, 1, 0, 1)
+    love.graphics.circle("fill", self.x, self.y, 2)
+    
+    -- Show hitstun status
+    if self.hitstunTimer > 0 then
+      love.graphics.setColor(1, 0, 0, 1)
+      love.graphics.print("HITSTUN", self.x - 20, self.y - 40)
+    end
+    
     love.graphics.setColor(1, 1, 1, 1)
   end
 end
@@ -210,13 +281,52 @@ end
 function Player:getMuzzle()
   local mx = self.x + (self.facing >= 0 and cfg.PROJ.muzzleX or -cfg.PROJ.muzzleX)
   local my = self.y + cfg.PROJ.muzzleY
+  Audio.playSFX("shoot")
   return mx, my, self.facing
 end
 
-function Player:getCollider()
-  local x = self.x - math.floor(self.cw / 2) + self.cox
-  local y = self.y - self.ch + self.coy
-  return x, y, self.cw, self.ch
+function Player:takeDamage(amount, sourceX)
+  if self.invincible then return false end
+  
+  self.hp = math.max(0, self.hp - (amount or 1))
+  self.invincible = true
+  self.invincibleTimer = self.invincibleDuration
+  self.damageFlashTimer = 0.2
+  self.hitstunTimer = self.hitstunDuration
+  
+  -- Apply knockback away from damage source
+  if sourceX then
+    local knockbackDir = self.x > sourceX and 1 or -1
+    self.knockbackVelX = knockbackDir * 150  -- Stronger horizontal push
+    if self.onGround then
+      self.knockbackVelY = -120  -- Small upward pop
+      self.onGround = false
+    end
+  end
+  
+  Audio.playSFX("hit")
+  
+  return self.hp <= 0
+end
+
+function Player:heal(amount)
+  self.hp = math.min(self.maxHp, self.hp + (amount or 1))
+end
+
+function Player:respawn(x, y)
+  self.x = x
+  self.y = y
+  self.vx = 0
+  self.vy = 0
+  self.onGround = false
+  self.hp = self.maxHp
+  self.facing = 1
+  self.invincible = false
+  self.invincibleTimer = 0
+  self.damageFlashTimer = 0
+  self.hitstunTimer = 0
+  self.knockbackVelX = 0
+  self.knockbackVelY = 0
 end
 
 return Player

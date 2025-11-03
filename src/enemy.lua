@@ -2,6 +2,7 @@ local cfg    = require("config")
 local Anim   = require("src.anim")
 local Assets = require("src.assets")
 local dbg    = require("cv_debug")
+local Audio  = require("src.audio")
 
 local Enemy = {}
 Enemy.__index = Enemy

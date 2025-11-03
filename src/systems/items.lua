@@ -1,8 +1,9 @@
 local Item = require("src.item")
+local Audio = require("src.audio")
 
 local Items = {}
 Items.list = {}
-Items.count = 0  -- total collected (for simple feedback)
+Items.count = 0
 
 function Items.init()
   for i=#Items.list,1,-1 do Items.list[i]=nil end
@@ -30,6 +31,7 @@ function Items.collect(index, player)
   if not it then return end
   it.collected = true
   Items.count = Items.count + 1
+  Audio.playSFX("collect")
   -- Simple effect hook / player gains could go here (HP, score, etc.)
   table.remove(Items.list, index)
 end

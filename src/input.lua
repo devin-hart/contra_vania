@@ -8,12 +8,21 @@ local bindings = {
   debug  = { "f1" },
   dump   = { "f2" },
   quit   = { "escape" },
-  shoot  = { "j", "k", "lctrl" }, -- pick preferred keys; tweak anytime
+  shoot  = { "j", "k", "lctrl" },
+  pause  = { "p", "return" },
+  
+  -- Menu navigation
+  menu_up     = { "up", "w" },
+  menu_down   = { "down", "s" },
+  menu_left   = { "left", "a" },
+  menu_right  = { "right", "d" },
+  menu_select = { "return", "space" },
+  menu_back   = { "escape", "backspace" },
 }
 
-local down = {}       -- key -> boolean (held)
-local pressed = {}    -- key -> boolean (edge this frame)
-local released = {}   -- key -> boolean (edge this frame)
+local down = {}
+local pressed = {}
+local released = {}
 
 -- Helpers
 local function anyBound(action, predicate)
@@ -27,12 +36,11 @@ end
 
 -- Public API
 function Input.bind(action, keys)
-  -- keys: string or { ... }
   if type(keys) == "string" then keys = { keys } end
   bindings[action] = keys
 end
 
-function Input.setBindings(map)  -- replace all bindings at once
+function Input.setBindings(map)
   bindings = {}
   for action, keys in pairs(map or {}) do
     Input.bind(action, keys)
@@ -49,14 +57,12 @@ function Input.keyreleased(key)
   released[key] = true
 end
 
--- Call once per frame in love.update(dt)
 function Input.update(dt)
-  -- clear pressed/released edges at end of frame
   pressed = {}
   released = {}
 end
 
--- Queries (by action or raw key)
+-- Queries
 function Input.isDown(actionOrKey)
   if bindings[actionOrKey] then
     return anyBound(actionOrKey, function(k) return down[k] end)

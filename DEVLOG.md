@@ -743,3 +743,341 @@ This system ties into the existing `cv_debug` overlay (toggled with F1), allowin
 - Works across all levels and scales correctly with camera movement.
 - Useful for aligning tile collision data and sprite hitboxes before switching to final tileset art.
 
+### [2025-11-02] — Step 21: Tileset Graphics + Environment Rendering
+
+**Summary**
+Replaced placeholder solid tiles with enhanced procedural rendering and optional tileset support.
+Added multiple parallax background layers for atmospheric depth and visual polish.
+
+**Changes**
+
+- **`src/tilemap.lua`**
+  - Added tileset image loading with quad-based rendering
+  - Implemented smart autotiling based on neighbor detection
+  - Created detailed procedural platform rendering:
+    - Grass/moss on exposed top surfaces
+    - Stone texture with noise patterns
+    - Depth shading and visual detail
+  - Graceful fallback when no tileset image exists
+
+- **`src/background.lua`**
+  - Expanded from 2 to 5 parallax layers:
+    - Clouds (slowest, 0.08×)
+    - Distant mountains (0.15×)
+    - Far hills (0.30×)
+    - Near hills (0.60×)
+    - Foreground foliage (0.75×)
+  - All layers procedurally generated
+  - Creates sense of depth and atmosphere
+
+- **`config.lua`**
+  - Added tileset configuration section
+  - Optional tileset path support
+
+- **`main.lua`**
+  - Integrated tileset loading
+  - Updated UI text for Step 21
+
+- **`assets/levels/level1.lua`**
+  - Redesigned level layout with proper platforming progression
+  - Added jumpable platforms at varied heights
+  - Included obstacles and pillars for gameplay variety
+
+**Notes**
+- No image assets required - procedural art looks polished
+- Tileset support ready when assets are created
+- Platform rendering automatically adjusts based on tile neighbors
+- All layers respect camera position and parallax factors
+
+**Next Steps**
+1. UI + HUD elements (Step 22)
+2. Add health bar, score display, weapon indicator
+
+---
+
+### [2025-11-02] — Step 22: UI + HUD Elements
+
+**Summary**
+Implemented complete HUD system with health bar, ammo counter, score display, and gems tracker.
+Added pause functionality with overlay menu.
+
+**Changes**
+
+- **`src/hud.lua`** (new)
+  - Health bar with dynamic color (green → yellow → red)
+  - Ammo counter with bullet icon
+  - Score display (6-digit format)
+  - Gems counter with visual icon
+  - Pause menu overlay with darkened background
+
+- **`src/player.lua`**
+  - Added health tracking (`hp`, `maxHp`)
+  - Added ammo tracking (`ammo`, `maxAmmo`)
+  - Implemented `takeDamage(amount)` method
+  - Implemented `heal(amount)` method
+  - Fixed collision system to use center-based hitbox
+  - Dynamic hitbox sizing (changes with sprite state)
+
+- **`config.lua`**
+  - Added HUD color definitions
+  - Simplified collider config (now dynamic)
+
+- **`src/input.lua`**
+  - Added pause key binding (P, Enter)
+
+- **`main.lua`**
+  - Integrated HUD rendering in UI layer
+  - Added pause state management
+  - Game freezes during pause
+  - Added game state tracking (score, gems)
+
+**Notes**
+- HUD positioned in corners to avoid gameplay area
+- Health bar color changes based on remaining HP
+- Pause works with P or Enter keys
+- Infinite ammo for now (can be limited later)
+- Score system ready for implementation
+
+**Next Steps**
+1. Pause + Options Menu (Step 23)
+2. Add menu navigation and settings
+
+### [2025-11-02] — Step 23: Pause + Options Menu
+
+**Summary**
+Expanded the basic pause overlay into a full menu system with navigation, settings, and multiple screens.
+Added options menu with volume controls and debug mode toggle.
+
+**Changes**
+
+- **`src/menu.lua`** (new)
+  - Complete menu system with navigation
+  - Main pause menu (Resume, Options, Quit to Title, Quit Game)
+  - Options submenu with settings:
+    - Music volume slider (0-100%)
+    - SFX volume slider (0-100%)
+    - Debug mode toggle (ON/OFF)
+  - Visual sliders and toggles
+  - Menu navigation with keyboard
+  - Settings storage system (ready for persistence)
+
+- **`src/input.lua`**
+  - Added menu navigation bindings:
+    - `menu_up` / `menu_down` - Navigate items
+    - `menu_left` / `menu_right` - Adjust values
+    - `menu_select` - Confirm selection
+    - `menu_back` - Return/cancel
+  - Menu keys use same WASD/Arrow keys as gameplay
+
+- **`main.lua`**
+  - Integrated menu system into pause state
+  - Menu input handling in paused mode
+  - Menu actions (resume, quit, options navigation)
+  - Settings applied from menu selections
+  - Placeholder for "Quit to Title" (Step 27)
+
+**Controls**
+- **P or Enter** - Pause game
+- **↑↓ / W/S** - Navigate menu
+- **←→ / A/D** - Adjust sliders
+- **Enter / Space** - Select
+- **ESC** - Back/Resume
+
+**Notes**
+- Menu uses dark overlay with semi-transparent box
+- Selection indicated with `>` symbol
+- Visual feedback for all interactions
+- Settings stored in memory (persistence in future step)
+- Menu system scales easily for additional options
+
+**Next Steps**
+1. Sound + Music Integration (Step 24)
+2. Use volume settings from options menu
+3. Add SFX for menu navigation and gameplay events
+
+### [2025-11-02] — Step 24: Sound + Music Integration
+
+**Summary**
+Implemented complete audio system with background music, sound effects, and volume controls.
+Audio manager automatically detects and loads .ogg, .mp3, or .wav formats with graceful fallbacks.
+
+**Changes**
+
+- **`src/audio.lua`** (new)
+  - Complete audio management system
+  - Music playback with looping and pause/resume
+  - Sound effect system with multi-instance playback
+  - Separate volume controls for music and SFX
+  - Auto-detects audio format (.ogg, .mp3, .wav)
+  - Graceful fallback if audio files missing (silent operation)
+  - Volume changes apply in real-time
+
+- **`src/player.lua`**
+  - Added jump sound effect trigger
+  - Added shoot sound effect in `getMuzzle()`
+
+- **`src/enemy.lua`**
+  - Added hit sound when damaged
+  - Added explosion sound on death
+
+- **`src/systems/items.lua`**
+  - Added collect sound on item pickup
+
+- **`main.lua`**
+  - Initialize audio system on startup
+  - Start stage music in `love.load()`
+  - Pause/resume music with game pause
+  - Menu navigation sounds (move/select)
+  - Apply volume changes from options menu in real-time
+
+- **`src/menu.lua`**
+  - Volume settings now affect audio playback immediately
+
+**Audio Files Structure (all optional):**
+```
+assets/audio/
+  music/
+    title.{ogg|mp3|wav}    - Title screen music
+    stage.{ogg|mp3|wav}    - Level/gameplay music
+    boss.{ogg|mp3|wav}     - Boss battle music
+  sfx/
+    jump.{ogg|mp3|wav}     - Player jump
+    shoot.{ogg|mp3|wav}    - Player shoot
+    hit.{ogg|mp3|wav}      - Enemy hit
+    explode.{ogg|mp3|wav}  - Enemy death
+    collect.{ogg|mp3|wav}  - Item pickup
+    pause.{ogg|mp3|wav}    - Pause menu
+    menu_move.{ogg|mp3|wav}    - Menu navigation
+    menu_select.{ogg|mp3|wav}  - Menu selection
+```
+
+**Sound Effects Triggered:**
+- Jump - When player leaves ground
+- Shoot - When player fires weapon
+- Hit - Enemy takes non-lethal damage
+- Explode - Enemy dies
+- Collect - Player picks up gem/item
+- Pause - Pause menu opens
+- Menu Move - Navigate menu options
+- Menu Select - Confirm menu selection
+
+**Notes**
+- Music uses streaming (memory efficient for long tracks)
+- SFX uses static sources (instant playback, no latency)
+- Multi-format support allows mixing .ogg, .mp3, .wav files
+- Volume sliders in options menu work immediately
+- Music pauses with game, resumes on unpause
+- All audio is optional - game works silently if files missing
+- SFX instances can overlap (multiple sounds play simultaneously)
+
+**Recommended Resources for Audio:**
+- jsfxr.me - Generate retro sound effects
+- ChipTone - Advanced 8-bit sound generator
+- OpenGameArt.org - Free game audio assets
+- BeepBox.co - Create chiptune music in browser
+
+**Next Steps**
+1. Save System + Checkpoints (Step 25)
+2. Persist player progress and settings
+3. Add checkpoint respawn logic
+
+### [2025-11-02] — Step 25: Save System + Checkpoints + Enemy Damage
+
+**Summary**
+Implemented persistent save system with checkpoints, respawn mechanics, and player death handling.
+Added enemy contact damage with knockback, hitstun, and invincibility frames for clear hit feedback.
+
+**Changes**
+
+- **`src/save.lua`** (new)
+  - Complete save/load system with Lua serialization
+  - Persistent data structure:
+    - Progress (current level, checkpoint position, score, gems)
+    - Settings (music/SFX volume, debug mode)
+    - Statistics (total deaths, kills, playtime)
+  - Auto-save functionality
+  - Version compatibility with default value merging
+  - Save file management (load, save, delete)
+
+- **`src/player.lua`**
+  - Added `respawn(x, y)` method for checkpoint revival
+  - Implemented invincibility frames (1.5s after damage)
+  - Added damage flash effect (red tint for 0.2s)
+  - Visual blinking during invincibility period
+  - Knockback system:
+    - Pushes player away from damage source (150 px/s)
+    - Small upward pop if grounded (-120 velocity)
+    - Direction based on enemy position
+  - Hitstun implementation:
+    - 0.3 second control lockout on hit
+    - Knockback velocity applied during hitstun
+    - Input completely disabled until hitstun expires
+  - Debug visualization shows hitstun status (F1)
+
+- **`src/systems/collisions.lua`**
+  - Added PLAYER ↔ ENEMY contact damage
+  - Only living enemies deal damage
+  - Passes enemy position to player for knockback direction
+  - 1 HP damage per enemy contact
+  - Respects invincibility frames (can't be hit repeatedly)
+
+- **`assets/levels/level1.lua`**
+  - Added checkpoint array with positions:
+    - Start (x=32, y=160)
+    - Mid-level (x=320, y=96)
+    - Near end (x=640, y=160)
+
+- **`main.lua`**
+  - Save system initialization on startup
+  - Load saved progress and settings
+  - Apply audio volumes from saved settings
+  - Checkpoint activation detection (20px radius)
+  - Death handling with respawn at last checkpoint
+  - Death and kill stat tracking
+  - Continuous playtime tracking
+  - Auto-save settings and progress
+  - Debug visualization of checkpoints (F1)
+    - Green = activated, Yellow = available
+
+**Save File Location:**
+- Windows: `C:\Users\[user]\AppData\Roaming\LOVE\contra_vania\`
+- macOS: `~/Library/Application Support/LOVE/contra_vania/`
+- Linux: `~/.local/share/love/contra_vania/`
+- Filename: `contra_vania_save.lua`
+
+**Damage System Features:**
+- Contact with enemy → 1 HP damage
+- Red flash effect on hit
+- Knocked back away from enemy
+- 0.3s control lockout (hitstun)
+- 1.5s invincibility (can't be hit again)
+- Visual blinking during invincibility
+- Sound effect on hit
+- Explosion sound on death
+
+**Checkpoint System:**
+- Walk within 20px radius to activate
+- Collect sound plays on activation
+- Progress auto-saved when checkpoint reached
+- Respawn at last checkpoint on death
+- Visual indicators in debug mode
+
+**Statistics Tracked:**
+- Total player deaths
+- Total enemy kills
+- Total playtime (seconds)
+- Gems collected
+- Current score
+
+**Notes**
+- Settings persist between sessions
+- Progress auto-saves continuously
+- Knockback values tuned for good feel without being punishing
+- Hitstun brief enough to not feel frustrating
+- Debug mode shows checkpoint circles and hitstun status
+
+**Next Steps**
+1. Boss Logic Framework (Step 26)
+2. Multi-phase boss encounters
+3. Boss health bar UI
+4. Boss intro/outro sequences

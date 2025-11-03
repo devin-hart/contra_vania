@@ -46,10 +46,9 @@ C.SPRITES = {
     jumpFrameH = 20,
   },
   
-  -- NEW: Tileset configuration
   tileset = {
     path = "assets/gfx/tiles/tileset.png",
-    tileSize = 16,  -- must match level tile size
+    tileSize = 16,
   }
 }
 
@@ -64,15 +63,19 @@ C.COLORS = {
   accent = {0.20, 0.80, 0.30, 1.0},
   player = {0.20, 0.90, 0.30, 1.0},
   white  = {1, 1, 1, 1},
+  
+  -- HUD colors
+  hud_label       = {0.7, 0.7, 0.8, 1.0},
+  hud_health_full = {0.2, 0.8, 0.3, 1.0},
+  hud_health_mid  = {0.9, 0.7, 0.2, 1.0},
+  hud_health_low  = {0.9, 0.2, 0.2, 1.0},
 }
 
--- Gameplay collider (independent of sprite size)
+-- Gameplay collider (dynamically calculated from sprite size)
+-- Hitbox is now 80% width, 90% height of current sprite
 C.COLLIDER = {
   player = {
-    w = 20,
-    h = 30,
-    ox = 0,
-    oy = 0,
+    -- No longer needed - calculated dynamically!
   }
 }
 
