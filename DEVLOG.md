@@ -1081,3 +1081,91 @@ Added enemy contact damage with knockback, hitstun, and invincibility frames for
 2. Multi-phase boss encounters
 3. Boss health bar UI
 4. Boss intro/outro sequences
+
+### [2025-11-03] — Step 26: Boss Logic Framework + Projectile System
+
+**Summary**
+Implemented complete boss encounter system with multi-phase AI, projectile patterns, and contact damage.
+The FlyingEye boss features three difficulty phases, varied attack patterns, and proper collision handling.
+
+**Changes**
+
+- **`src/tilemap.lua`**
+  - Fixed critical bug: now properly loads `checkpoints` and `bossSpawn` from level data.
+  - Added debug logging for boss spawn verification.
+  - These fields were defined in level files but weren't being copied to the tilemap object.
+
+- **`src/bossprojectile.lua`** (new)
+  - Boss-specific projectile class with multiple types.
+  - Normal projectiles (rectangular).
+  - Homing projectiles (diamond-shaped, track player).
+  - Rotation based on velocity direction.
+  - Configurable size, speed, damage, and lifetime.
+
+- **`src/systems/bossprojectiles.lua`** (new)
+  - Manager for boss projectile spawning and updates.
+  - Pattern system with multiple attack types:
+    - `single` - Single aimed shot
+    - `spread3` - 3-way spread
+    - `spread5` - 5-way spread
+    - `circle8` - 360-degree burst (8 projectiles)
+    - `homing` - Tracking missile
+  - Terrain collision detection.
+  - Off-screen cleanup.
+
+- **`src/bosses/flyingeye.lua`**
+  - Complete boss implementation with 3 phases.
+  - Phase 1 (>66% HP): Single shots + 3-way spreads, slow attacks (1.8s interval).
+  - Phase 2 (33-66% HP): 5-way spreads + homing missiles, faster (1.2s interval).
+  - Phase 3 (<33% HP): Circle bursts + aggressive homing, fastest (0.8s interval).
+  - Smooth hovering motion (sine wave vertical movement).
+  - Horizontal movement pattern (picks random positions in arena).
+  - Aggressive positioning in phase 3.
+  - Attack counter tracks pattern variations.
+
+- **`src/systems/collisions.lua`**
+  - Added boss projectile → player collision.
+  - Added boss → player contact damage.
+  - Boss projectiles respect player invincibility frames.
+  - Knockback direction based on projectile/boss position.
+
+- **`main.lua`**
+  - Integrated `BossProjectiles` system initialization and updates.
+  - Boss projectiles clear on player death.
+  - Boss projectiles clear on boss defeat.
+  - Boss resets properly when player dies during fight.
+  - Victory music transition when boss defeated.
+  - Boss trigger system uses level data properly.
+
+**Boss Fight Flow**
+1. Player reaches trigger point (x=1000 in level1).
+2. Boss slides in from off-screen with intro animation.
+3. Music switches to boss theme.
+4. Boss begins attacking with phase-appropriate patterns.
+5. Phase transitions at 66% and 33% HP.
+6. On defeat: projectiles clear, music returns to stage theme.
+7. On player death: boss resets, returns to inactive state.
+
+**Attack Pattern Details**
+- Phase 1: Every 3rd attack is spread, otherwise single.
+- Phase 2: Every 4th attack is homing, otherwise 5-way spread.
+- Phase 3: Every 5th is circle burst, every 3rd is homing, otherwise fast spread.
+
+**Projectile Properties**
+- Normal: 8×8 px, speed 100-130 px/s, 1 damage.
+- Homing: 8×8 px, speed 70-80 px/s, homing strength 2.5-3.5, 1 damage.
+- All projectiles: 5 second lifetime, auto-destroy on terrain hit.
+
+**Notes**
+- Boss contact damage implemented but arena boundaries not yet added.
+- Player can still leave arena during fight (will fix in future).
+- Boss visual is still placeholder rectangle (sprites planned).
+- No screen shake or particle effects yet (polish phase).
+- Boss health bar displays during active fight.
+- Full integration with existing save system and checkpoints.
+
+**Next Steps**
+1. Title Screen + Scene Flow (Step 27)
+2. Boss arena boundaries/camera lock
+3. Victory rewards and powerup drops
+4. Boss sprite animations

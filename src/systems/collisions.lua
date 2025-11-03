@@ -4,10 +4,10 @@ local cfg = require("config")
 local Collisions = {}
 
 -- Handles all collision checks each frame.
-function Collisions.update(dt, world, player, enemies, projectiles, items)
+function Collisions.update(dt, world, player, enemies, projectiles, items, bossProjectiles, boss)
   if #enemies == 0 and not player then return end
 
-  -- PROJECTILE → ENEMY
+  -- PLAYER PROJECTILES → ENEMY
   if projectiles and projectiles.list and #projectiles.list > 0 and #enemies > 0 then
     local b = 1
     while b <= #projectiles.list do
@@ -65,6 +65,39 @@ function Collisions.update(dt, world, player, enemies, projectiles, items)
             player:takeDamage(1, enemy.x)
           end
         end
+      end
+    end
+  end
+  
+  -- BOSS PROJECTILES → PLAYER
+  if player and player.getCollider and bossProjectiles and bossProjectiles.list and #bossProjectiles.list > 0 then
+    local px, py, pw, ph = player:getCollider()
+    
+    local b = 1
+    while b <= #bossProjectiles.list do
+      local proj = bossProjectiles.list[b]
+      local bx, by, bw, bh = proj:getCollider()
+      
+      if Collision.rectsOverlap(px, py, pw, ph, bx, by, bw, bh) then
+        -- Player takes damage
+        if player.takeDamage then
+          player:takeDamage(proj.damage or 1, proj.x)
+        end
+        table.remove(bossProjectiles.list, b)
+      else
+        b = b + 1
+      end
+    end
+  end
+  
+  -- PLAYER ↔ BOSS (contact damage)
+  if player and player.getCollider and boss and boss:isActive() and not boss.dead then
+    local px, py, pw, ph = player:getCollider()
+    local bx, by, bw, bh = boss:getCollider()
+    
+    if Collision.rectsOverlap(px, py, pw, ph, bx, by, bw, bh) then
+      if player.takeDamage then
+        player:takeDamage(1, boss.x)
       end
     end
   end

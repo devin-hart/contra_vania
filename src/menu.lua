@@ -74,16 +74,23 @@ function Menu.select()
     currentMenu = "options"
     selectedIndex = 1
     menuItems = menus[currentMenu].items
+    return nil
   elseif item.action == "back" then
     currentMenu = "main"
     selectedIndex = 1
     menuItems = menus[currentMenu].items
+    return nil
   elseif item.action == "title" then
+    -- Reset menu state before returning
+    currentMenu = "main"
+    selectedIndex = 1
+    menuItems = menus[currentMenu].items
     return "title"
   elseif item.action == "quit" then
     return "quit"
   elseif item.action == "debug_toggle" then
     settings.debugMode = not settings.debugMode
+    return nil
   end
   
   return nil

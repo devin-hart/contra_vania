@@ -31,6 +31,17 @@ function Tilemap.load(path)
   self.worldWidth  = self.tw * self.ts
   self.worldHeight = self.th * self.ts
 
+  -- IMPORTANT: Copy over optional level data
+  self.checkpoints = data.checkpoints or {}
+  self.bossSpawn = data.bossSpawn  -- This was missing!
+  
+  -- Debug log
+  if self.bossSpawn then
+    print("Tilemap: Boss spawn loaded at", self.bossSpawn.x, self.bossSpawn.y, "trigger:", self.bossSpawn.triggerX)
+  else
+    print("Tilemap: No boss spawn defined in level")
+  end
+
   -- Try to load tileset image (optional)
   self.tileset = Assets.get("tileset") or Assets.loadOptional("tileset", "assets/gfx/tiles/tileset.png")
   
