@@ -56,11 +56,11 @@ end
 function love.update(dt)
   dbg.update(dt)
   
-  -- Update input before scene
-  Input.update(dt)
-  
-  -- Update scene
+  -- Update scene FIRST (while input states are still fresh)
   SceneManager.update(dt)
+  
+  -- Clear input states AFTER scene has processed them
+  Input.update(dt)
 end
 
 function love.keypressed(key)

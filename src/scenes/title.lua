@@ -77,8 +77,8 @@ function TitleScene:update(dt)
   animTimer = animTimer + dt
   pulseTimer = pulseTimer + dt
   
-  -- Input handling - check for UP movement
-  if Input.wasPressed("up") or Input.wasPressed("w") or Input.wasPressed("left") or Input.wasPressed("a") then
+  -- Input handling using menu action names
+  if Input.wasPressed("menu_up") then
     Audio.playSFX("menu_move")
     selectedOption = selectedOption - 1
     if selectedOption < 1 then
@@ -94,8 +94,7 @@ function TitleScene:update(dt)
       tries = tries + 1
       if tries > #menuOptions then break end
     end
-  -- Check for DOWN movement
-  elseif Input.wasPressed("down") or Input.wasPressed("s") or Input.wasPressed("right") or Input.wasPressed("d") then
+  elseif Input.wasPressed("menu_down") then
     Audio.playSFX("menu_move")
     selectedOption = selectedOption + 1
     if selectedOption > #menuOptions then
@@ -111,8 +110,7 @@ function TitleScene:update(dt)
       tries = tries + 1
       if tries > #menuOptions then break end
     end
-  -- Check for SELECTION
-  elseif Input.wasPressed("space") or Input.wasPressed("return") or Input.wasPressed("j") or Input.wasPressed("k") then
+  elseif Input.wasPressed("menu_select") then
     Audio.playSFX("menu_select")
     self:executeOption(menuOptions[selectedOption].action)
   end
@@ -212,9 +210,9 @@ function TitleScene:draw()
     love.graphics.print(option.text, 80, y)
   end
   
-  -- Footer - show which keys work
+  -- Footer - show correct keys
   love.graphics.setColor(cfg.COLORS.hud_label[1], cfg.COLORS.hud_label[2], cfg.COLORS.hud_label[3], 0.5)
-  local footer = "WASD/Arrows to move  SPACE/ENTER/J/K to select"
+  local footer = "W/S or UP/DOWN arrows  SPACE/ENTER to select"
   local footerW = titleFont:getWidth(footer)
   love.graphics.print(footer, (cfg.RES_W - footerW) / 2, cfg.RES_H - 20)
   

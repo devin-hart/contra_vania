@@ -1169,3 +1169,138 @@ The FlyingEye boss features three difficulty phases, varied attack patterns, and
 2. Boss arena boundaries/camera lock
 3. Victory rewards and powerup drops
 4. Boss sprite animations
+
+### [2025-11-03] — Step 27: Title Screen + Scene Flow
+
+**Summary**
+Implemented complete scene management system with title screen, transitions, and proper game flow.
+Players can now start new games, continue from saves, and return to title screen from pause menu.
+Game now boots to a professional title screen instead of jumping directly into gameplay.
+
+**Changes**
+
+- **`src/scenemanager.lua`** (new)
+  - Central scene management system for game states.
+  - Scene registration and switching with `register()` and `switch()`.
+  - Fade transitions between scenes (configurable duration).
+  - Automatic enter/exit callbacks for cleanup.
+  - Input forwarding to active scene.
+  - Transition overlay rendering (fade to black).
+
+- **`src/scenes/title.lua`** (new)
+  - Complete title screen with animated entrance.
+  - Logo slides down from top with smooth animation.
+  - Menu slides up from bottom.
+  - Menu options: New Game, Continue, Options (placeholder), Quit.
+  - Continue option grayed out when no save data exists.
+  - Pulsing selection indicator (sine wave animation).
+  - Gradient background effect for visual polish.
+  - Input using menu actions (`menu_up`, `menu_down`, `menu_select`).
+  - Fade transition to game scene.
+  - Uses Viewport system for proper scaling.
+
+- **`src/scenes/game.lua`** (new)
+  - Complete game refactored as a scene.
+  - All gameplay code moved from main.lua into scene structure.
+  - `enter()`: Loads level, spawns entities, restores save data.
+  - `exit()`: Saves progress automatically.
+  - `update()`: All gameplay logic (player, enemies, boss, collisions).
+  - `draw()`: Viewport-based rendering with all layers.
+  - Pause menu "Quit to Title" now functional.
+  - Viewport scaling on scene enter for proper display.
+  - All boss, projectile, and gameplay systems preserved.
+
+- **`src/menu.lua`**
+  - Added proper handling for "Quit to Title" action.
+  - Resets menu state before returning to prevent issues.
+  - Menu structure unchanged (Resume, Options, Quit to Title, Quit Game).
+
+- **`main.lua`**
+  - Simplified to minimal bootstrap code.
+  - Loads assets once at startup.
+  - Initializes core systems (Audio, Save, Input).
+  - Registers title and game scenes.
+  - Starts with title screen instead of game.
+  - Fixed input update order: scenes process input BEFORE clearing.
+  - Forwards all events to SceneManager.
+  - Debug overlay (F1) works globally across all scenes.
+
+**Scene Flow**
+```
+BOOT
+  ↓
+TITLE SCREEN
+  ├─ New Game → GAME (fresh start, deletes save)
+  ├─ Continue → GAME (loads from checkpoint)
+  ├─ Options → (not yet implemented)
+  └─ Quit → Exit application
+  
+GAME SCENE
+  ├─ Play / Die / Respawn
+  └─ Pause Menu
+      ├─ Resume → Continue playing
+      ├─ Options → Settings (volume, debug)
+      ├─ Quit to Title → TITLE SCREEN (saves progress)
+      └─ Quit Game → Exit application
+```
+
+**Title Screen Controls**
+- W / UP arrow: Move up in menu
+- S / DOWN arrow: Move down in menu
+- SPACE / ENTER: Select option
+- ESC: Quit game (from title)
+
+**Input System Fix**
+- Critical bug fix: `Input.update(dt)` now called AFTER scene updates.
+- Previously cleared input states before scenes could read them.
+- Scenes now properly receive keypressed events.
+- All menu navigation now works correctly.
+
+**Transition System**
+- Fade transition: 0.8 second duration by default.
+- Halfway through fade: scene switches.
+- Callbacks execute after transition completes.
+- Music transitions handled in callbacks.
+- Extensible for other transition types (slide, wipe, etc.).
+
+**Visual Features**
+- Title logo: 2× scale, animated slide-in from top.
+- Subtitle: "Run. Gun. Explore." with proper positioning.
+- Menu: Animated slide-up from bottom.
+- Selection indicator: Pulsing green accent color.
+- Disabled options: Grayed out (Continue when no save).
+- Background: Vertical gradient using accent color.
+- Footer: Shows active control scheme.
+
+**Integration with Existing Systems**
+- Save system: Checks for existing progress to enable/disable Continue.
+- Audio system: Title music plays on title screen, stage music in game.
+- Settings: Audio volumes from save applied on startup.
+- Boss system: Fully preserved in game scene.
+- Projectile systems: Player and boss projectiles both work.
+- HUD: Health, ammo, score, gems all display correctly.
+- Pause menu: Full functionality including quit to title.
+
+**Technical Details**
+- Viewport created per-scene for proper scaling independence.
+- Each scene manages its own viewport instance.
+- Scene enter/exit ensure proper initialization and cleanup.
+- Game state (score, gems) preserved across scene transitions.
+- Checkpoint system integrated with scene flow.
+- Boss resets properly when returning from title after death.
+
+**Notes**
+- Options screen placeholder exists but not yet implemented.
+- Title music file optional (silently skips if missing).
+- All previous gameplay features fully functional.
+- Save system automatically handles scene transitions.
+- Debug mode (F1) works in all scenes.
+- Live reload still functional during development.
+
+**Next Steps**
+1. Options screen implementation (volume sliders, keybinds).
+2. Credits screen.
+3. Level select menu (if multiple levels added).
+4. Additional transition effects (slide, wipe, pixelate).
+5. Logo sprite/animation for title screen.
+6. Victory/game over scenes.
